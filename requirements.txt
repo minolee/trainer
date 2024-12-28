@@ -1,0 +1,7 @@
+lightning
+torch
+pyyaml
+pydantic
+tokenizers
+transformers
+accelerate

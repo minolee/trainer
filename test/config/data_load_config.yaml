@@ -1,0 +1,15 @@
+reader:
+  sources:
+    - name: test
+      source: /Users/minolee/Documents/Code/ops/rsc/jsonl_single_line/code/kor/synthetic/KT-MathCoder.jsonl
+      split:
+        type: train
+      reader_fn: read_simple
+      prompt: llama31
+      dataset: BaseDataset
+
+loader:
+  shuffle: false
+
+tokenizer:
+  from_pretrained: meta-llama/Llama-3.1-8B-Instruct
