@@ -1,7 +1,7 @@
 reader:
   sources:
     - name: test
-      source: /Users/minolee/Documents/Code/ops/rsc/jsonl_single_line/code/kor/synthetic/KT-MathCoder.jsonl
+      source: test/rsc/test_oneline.jsonl
       split:
         type: train
       reader_fn: read_simple

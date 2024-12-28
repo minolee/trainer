@@ -40,7 +40,7 @@ class TestBaseData:
         tokenizer = base_datamodule.tokenizer
         decoded = tokenizer.decode(train_dataset[0]["input_ids"], skip_special_tokens=False)
         for message in msg:
-            if message.speaker.lower() == "system": continue
+            if message.speaker.type == "System": continue
             assert prompt.wrap(message).rstrip(prompt.eot_token) in decoded
         
     def test_loss_mask(self, base_datamodule: DataModule):
@@ -54,6 +54,6 @@ class TestBaseData:
         target_decoded = tokenizer.decode(mask_applied_label).lstrip(zero_id)
         assert torch.all(train_dataset[0]["input_ids"][1:] == train_dataset[0]["label"][:-1])
         for message in msg:
-            if message.speaker.value.lower() in ["system", "user"]: continue
+            if message.speaker.type.lower() in ["system", "user"]: continue
             assert message.message in target_decoded
         

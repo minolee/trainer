@@ -4,3 +4,5 @@ example/
 __pycache__/
 .pytest_cache/
 .DS_Store
+lightning_logs
+!test/rsc

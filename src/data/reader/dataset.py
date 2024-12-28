@@ -24,6 +24,7 @@ def list_dataset():
 @dataset
 class BaseDataset(D):
     # read from KT style jsonl file, no passage used
+    # used for sft model
     def __init__(
         self, 
         data: Iterable[list[BaseMessage]], 
@@ -95,6 +96,10 @@ class BaseDataset(D):
     def __getitem__(self, idx):
         return self.tokenized[idx]
 
+
+@dataset
+class PreferenceDataset(D):
+    ...
 
 @dataset
 class PackingDataset(D):

@@ -1,0 +1,36 @@
+
+
+data_loader_config:
+  sources:
+    - name: test
+      source: test/rsc/test_oneline.jsonl
+      split:
+        type: train
+      reader_fn: read_simple
+      prompt: llama31
+      dataset: BaseDataset
+
+data_processor_config:
+  shuffle: false
+
+tokenizer_config:
+  from_pretrained: openai-community/gpt2
+
+model_load_config:
+  base_config: openai-community/gpt2
+  device: mps
+
+
+loss_config:
+  name: CrossEntropyLoss
+  ignore_index: -100
+
+optimizer_config:
+  name: AdamW
+  lr: 5e-5
+  weight_decay: 0.01
+
+scheduler_config:
+  name: WarmupLinearSchedule
+  warmup_steps: 100
+  t_total: 1000

@@ -1,13 +1,7 @@
 from __future__ import annotations
 from pydantic import BaseModel, ConfigDict, Field
 from .base_deco import create_register_deco
-__all__ = ["BaseConfig", "Config"]
-
-_config = {}
-Config = create_register_deco(_config)
-
-def get_config(name: str) -> type[BaseConfig]:
-    return _config[name.lower().replace("config", "") + "config"]
+__all__ = ["BaseConfig", "DictConfig"]
 
 
 class BaseConfig(BaseModel):
@@ -26,4 +20,7 @@ class BaseConfig(BaseModel):
         from src.utils import read_magic
         return cls(**read_magic(path)) # type: ignore
 
-    
+class DictConfig(BaseConfig):
+    """base dictionary config"""
+    name: str
+    # any additional config follows

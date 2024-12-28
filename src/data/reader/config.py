@@ -7,7 +7,9 @@ from enum import Enum
 class DataType(Enum):
     TRAIN = "train"
     DEV = "dev"
+    VALIDATION = "validation"
     TEST = "test"
+    PREDICT = "predict"
     MIXED = "mixed"
 
 class ReaderConfig(BaseConfig):
@@ -32,7 +34,6 @@ class ReaderElem(BaseConfig):
 class SplitConfig(BaseConfig):
     type: DataType = DataType.MIXED
     split_ratio: str | list[float | int] | None = None
-
     
     def parse_split_ratio(self) -> list[int]:
         """

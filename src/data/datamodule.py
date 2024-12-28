@@ -48,20 +48,18 @@ class DataModule(LightningDataModule):
                 dataset = dataset_cls(dialogue, stage, config, self.tokenizer)
                 self.prepared[stage].append(dataset)
             
-    def setup(self, stage=None):
-
+    def setup(self, stage=None | str | list[str]):
         if stage is None:
             stages = ["train", "dev", "test"]
         elif isinstance(stage, str):
             stages = [stage]
+        else:
+            stages = stage
         for stage in stages:
             if stage in self.processed: continue
             for dataset in self.prepared[stage]:
                 dataset.setup()
             self.processed[stage] = ConcatDataset(self.prepared[stage])
-    
-    def __getitem__(self, stage):
-        return self.processed[stage]
     
     def train_dataloader(self):
         return create_dataloader(self.processed["train"], self.dataloader_config, self.tokenizer) # type: ignore

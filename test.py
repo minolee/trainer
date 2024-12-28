@@ -1,11 +1,6 @@
-from functools import partial
+from transformers import AutoModel
+import torch
+model = AutoModel.from_pretrained("bert-base-uncased")
 
-class A:
-    def __init__(self, a, b):
-        self.a = a
-        self.b = b
+torch.save(model.state_dict(), "rsc/model/test/model.bin")
 
-p = partial(A, a=1)
-
-x = p(2)
-print(x.__class__, x.a, x.b)
