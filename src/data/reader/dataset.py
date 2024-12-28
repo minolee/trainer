@@ -64,10 +64,10 @@ class BaseDataset(D):
                 attention_mask = torch.cat(attention_mask, dim=0)[:-1]
                 loss_mask = torch.cat(loss_mask, dim=0)[:-1]
                 label = torch.cat([input_ids[1:], torch.tensor([self.tokenizer.eos_token_id])], dim=0) # finish with eos token
+                label = torch.where(loss_mask, label, -100)
                 d = {
                     "input_ids": input_ids,
                     "attention_mask": attention_mask,
-                    "loss_mask": loss_mask,
                     "label": label
                 }
                 if self.split == "dev":

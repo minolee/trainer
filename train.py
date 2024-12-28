@@ -31,8 +31,6 @@ def main(
         train_config = config
     )
 
-    model.setup()
-
     trainer = Trainer(**config.trainer_kwargs)
     
     trainer.fit(model, datamodule=datamodule)

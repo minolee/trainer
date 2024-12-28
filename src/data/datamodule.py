@@ -48,13 +48,15 @@ class DataModule(LightningDataModule):
                 dataset = dataset_cls(dialogue, stage, config, self.tokenizer)
                 self.prepared[stage].append(dataset)
             
-    def setup(self, stage=None | str | list[str]):
-        if stage is None:
-            stages = ["train", "dev", "test"]
-        elif isinstance(stage, str):
-            stages = [stage]
+    def setup(self, stage):
+        # stage: fit, validate, test, predict
+        stages = []
+        if stage == "fit":
+            stages = ["train", "dev"]
+        elif stage == "validate":
+            stages = ["dev"]
         else:
-            stages = stage
+            stages = ["test"]
         for stage in stages:
             if stage in self.processed: continue
             for dataset in self.prepared[stage]:

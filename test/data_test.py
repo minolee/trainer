@@ -23,14 +23,14 @@ def base_datamodule():
     )
     dm.prepare_data()
     assert "train" in dm.reader.corpus
-    dm.setup()
+    dm.setup("fit")
     return dm
 
 # TODO dialog dataset test
 
 class TestBaseData:
     def test_dataset_setup(self, base_datamodule: DataModule):
-        train_dataset = base_datamodule["train"]
+        train_dataset = base_datamodule.prepared["train"][0]
         assert len(set(train_dataset[0][k].shape for k in train_dataset[0])) == 1
         assert len(train_dataset) == 1 # type: ignore
         
@@ -44,15 +44,15 @@ class TestBaseData:
             assert prompt.wrap(message).rstrip(prompt.eot_token) in decoded
         
     def test_loss_mask(self, base_datamodule: DataModule):
-        train_dataset = base_datamodule["train"]
+        train_dataset = base_datamodule.prepared["train"][0]
         msg = base_datamodule.reader.corpus["train"][0][0][0]
         prompt = base_datamodule.prepared["train"][0].prompt
 
         tokenizer = base_datamodule.tokenizer
-        mask_applied_label = torch.where(train_dataset[0]["loss_mask"], train_dataset[0]["label"], 0)
+        mask_applied_label = torch.where(train_dataset[0]["label"] != -100, train_dataset[0]["label"], 0)
         zero_id = tokenizer.convert_ids_to_tokens(0)[0]
         target_decoded = tokenizer.decode(mask_applied_label).lstrip(zero_id)
-        assert torch.all(train_dataset[0]["input_ids"][1:] == train_dataset[0]["label"][:-1])
+        # assert torch.all(train_dataset[0]["input_ids"][1:] == train_dataset[0]["label"][:-1])
         for message in msg:
             if message.speaker.type.lower() in ["system", "user"]: continue
             assert message.message in target_decoded
