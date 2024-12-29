@@ -1,6 +1,7 @@
 
 from functools import wraps, partial
 from typing import TypeVar, Callable
+from types import ModuleType
 from .base_config import CallConfig
 
 __all__ = ["create_register_deco", "create_get_fn"]
@@ -21,12 +22,20 @@ def create_register_deco(registry: dict):
         return inner_fn
     return deco
 
-def create_get_fn(registry: dict[str, T]):
+def create_get_fn(registry: dict[str, T] | ModuleType):
     def get_fn(name: str | CallConfig) -> T | partial[T]:
+        
+        if isinstance(registry, dict):
+            name_getter = lambda name: registry[name.lower()] # type: ignore
+        elif isinstance(registry, ModuleType):
+            name_getter = lambda name: getattr(registry, name) # 여기서는 lower()를 사용하지 않음
+        else:
+            raise ValueError("registry should be dict or module")
+        
         if isinstance(name, str):
-            return registry[name.lower()]
+            return name_getter(name)
         elif isinstance(name, CallConfig):
             kwargs = name.model_dump()
             kwargs.pop("name")
-            return partial(registry[name.name.lower()], **kwargs)
+            return partial(name_getter(name.name), **kwargs)
     return get_fn

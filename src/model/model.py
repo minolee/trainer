@@ -2,6 +2,7 @@ from __future__ import annotations
 import torch
 import lightning as pl
 from .config import ModelConfig
+from src.base import create_get_fn
 from transformers import AutoModelForCausalLM, AutoConfig, PreTrainedModel
 
 from typing import TYPE_CHECKING
@@ -9,7 +10,7 @@ if TYPE_CHECKING:
     from src.train import TrainConfig
     from src.inference import InferenceConfig
 
-
+get_loss_fn = create_get_fn(torch.nn)
 
 class BaseModel(pl.LightningModule):
     """Base model for all model pipeline. can be used for sft model without modification"""
@@ -35,7 +36,7 @@ class BaseModel(pl.LightningModule):
         self.model.to(self.model_config.device) # type: ignore
         if stage in ["fit", "validate"]:
             assert self.train_config is not None
-            self.loss_fn = getattr(torch.nn, self.train_config.loss_config.name)(**self.train_config.loss_config.model_dump(exclude={"name"}))
+            self.loss_fn = get_loss_fn(self.train_config.loss_config)()
 
         # TODO add validation and inference setup
         else:
