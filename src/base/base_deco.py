@@ -1,7 +1,7 @@
 
 from functools import wraps, partial
 from typing import TypeVar, Callable
-from .base_config import DictConfig
+from .base_config import CallConfig
 
 __all__ = ["create_register_deco", "create_get_fn"]
 
@@ -22,10 +22,10 @@ def create_register_deco(registry: dict):
     return deco
 
 def create_get_fn(registry: dict[str, T]):
-    def get_fn(name: str | DictConfig) -> T | partial[T]:
+    def get_fn(name: str | CallConfig) -> T | partial[T]:
         if isinstance(name, str):
             return registry[name.lower()]
-        elif isinstance(name, DictConfig):
+        elif isinstance(name, CallConfig):
             kwargs = name.model_dump()
             kwargs.pop("name")
             return partial(registry[name.name.lower()], **kwargs)

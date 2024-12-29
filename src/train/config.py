@@ -1,4 +1,4 @@
-from src.base import BaseConfig, DictConfig
+from src.base import BaseConfig, CallConfig
 from src.data.reader import ReaderConfig
 from src.data.dataloader import DataLoaderConfig
 from src.model import ModelConfig
@@ -14,9 +14,9 @@ class TrainConfig(BaseConfig):
     tokenizer_config: TokenizerConfig
     model_load_config: ModelConfig # model_config가 안되는거 실화냐
 
-    loss_config: DictConfig
-    optimizer_config: DictConfig
-    scheduler_config: DictConfig
+    loss_config: CallConfig
+    optimizer_config: CallConfig
+    scheduler_config: CallConfig
 
     # deepspeed_config: DeepSpeedConfig | None = None
 

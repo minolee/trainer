@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.base import BaseConfig, DictConfig
+from src.base import BaseConfig, CallConfig
 from pathlib import Path
 from enum import Enum
 from pydantic import field_serializer
@@ -17,18 +17,18 @@ class ReaderConfig(BaseConfig):
     sources: list[ReaderElem]
 
     lazy: bool = False # load only when needed
-    default_reader_fn: str | DictConfig | None = None
-    default_dataset: str | DictConfig | None = None
-    default_prompt: str | DictConfig | None = None
+    default_reader_fn: str | CallConfig | None = None
+    default_dataset: str | CallConfig | None = None
+    default_prompt: str | CallConfig | None = None
 
 class ReaderElem(BaseConfig):
     name: str | None = None # name of data
     source: str # path to the data source
     split: SplitConfig
 
-    reader_fn: str | DictConfig | None = None # how to read raw file
-    prompt: str | DictConfig | None = None # how to convert raw data into middle structure
-    dataset: str | DictConfig | None = None # which dataset to use
+    reader_fn: str | CallConfig | None = None # how to read raw file
+    prompt: str | CallConfig | None = None # how to convert raw data into middle structure
+    dataset: str | CallConfig | None = None # which dataset to use
 
 class SplitConfig(BaseConfig):
     type: DataType = DataType.MIXED

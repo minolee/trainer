@@ -1,4 +1,4 @@
-from src.base import BaseConfig, DictConfig
+from src.base import BaseConfig, CallConfig
 
 from src.data.reader import ReaderConfig
 from src.data.dataloader import DataLoaderConfig
@@ -10,10 +10,10 @@ __all__ = ["InferenceConfig"]
 class InferenceConfig(BaseConfig):
 
     pretrained_model: str # model path or pretrained model card on huggingface
-    
+
     data_loader_config: ReaderConfig
     data_processor_config: DataLoaderConfig
 
-    decoder_config: DictConfig
+    decoder_config: CallConfig
 
     # deepspeed_config: DeepSpeedConfig | None = None
