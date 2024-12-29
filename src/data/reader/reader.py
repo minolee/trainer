@@ -9,34 +9,6 @@ __all__ = ['Reader']
 Dialogue = list[BaseMessage]
 Corpus = list[Dialogue]
 
-def load_data(source: ReaderElem):
-    # raw data to input prompt
-    assert source.reader_fn is not None, f"reader_fn of {source.name or source.source} is not defined"
-    # assert source.prompt is not None, f"prompt of {source.name or source.source} is not defined"
-    reader_fn = get_reader_fn(source.reader_fn)
-    return reader_fn(source.source)
-
-def split_data(data: Iterable[Dialogue], split_ratio: list[int]):
-    # split data into train / dev / test
-    # split - dialogue - utterance
-    split_data: list[Corpus] = [[] for _ in range(len(split_ratio))]
-    
-    c = 0
-    idx = 0
-    it = iter(data)
-    while True:
-        try:
-            if c >= split_ratio[idx]:
-                c = 0
-                idx += 1
-                idx %= len(split_ratio)
-            line = next(it)
-            split_data[idx].append(line)
-            c += 1
-        except StopIteration:
-            break
-    return split_data
-
 class Reader:
     def __init__(self, config: ReaderConfig):
         self.config = config
@@ -60,7 +32,7 @@ class Reader:
         for source in self.config.sources:
             # raw data에 dataset loading function을 함께 묶어놔야 하는데..?
             # 와 진짜 못생겼다 어떡하냐
-            train, dev, test = split_data(load_data(source), source.split.parse_split_ratio())
+            train, dev, test = source.split(source.read())
             corpus["train"].append((train, source))
             corpus["dev"].append((dev, source))
             corpus["test"].append((test, source))
