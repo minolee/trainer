@@ -3,8 +3,8 @@
 from __future__ import annotations
 from typing import Callable, Iterable
 from .prompt import get_prompt
-from src.base import create_register_deco, create_get_fn, rank_iter, BaseMessage
-from src.utils import read_magic
+from src.base import create_register_deco, create_get_fn, BaseMessage
+from src.utils import read_magic, rank_iter
 
 __all__ = ["get_reader_fn", "list_reader_fn"]
 
