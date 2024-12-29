@@ -5,16 +5,16 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 import argparse
 from lightning import Trainer
-
+from src.env import MODEL_SAVE_DIR
 from src.data import DataModule
 from src.model import BaseModel
 from src.train.config import TrainConfig
 import torch
 
 def main(
-    config: TrainConfig,
-    save_dir: str
+    config: TrainConfig
 ):
+    save_dir = os.path.join(MODEL_SAVE_DIR, config.model_name)
     os.makedirs(save_dir, exist_ok=True)
     config.dump(os.path.join(save_dir, "config.yaml"))
     datamodule = DataModule(
@@ -31,7 +31,7 @@ def main(
         train_config = config
     )
 
-    trainer = Trainer(**config.trainer_kwargs)
+    trainer = Trainer(**config.trainer_config)
     
     trainer.fit(model, datamodule=datamodule)
 
@@ -44,8 +44,6 @@ def main(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, required=True)
-    parser.add_argument("--save_dir", type=str, required=True)
-    parser.add_argument("--model_name", type=str)
     args = parser.parse_args()
     config = TrainConfig.load(args.config)
-    main(config, args.save_dir)
+    main(config)

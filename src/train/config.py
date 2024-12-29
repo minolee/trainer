@@ -6,6 +6,9 @@ from src.tokenizer import TokenizerConfig
 from deepspeed import DeepSpeedConfig
 from pydantic import Field
 class TrainConfig(BaseConfig):
+
+    model_name: str # 모델이 저장될 이름, 이 path에 저장됨
+
     data_loader_config: ReaderConfig
     data_processor_config: DataLoaderConfig
     tokenizer_config: TokenizerConfig
@@ -17,4 +20,4 @@ class TrainConfig(BaseConfig):
 
     # deepspeed_config: DeepSpeedConfig | None = None
 
-    trainer_kwargs: dict = Field(default_factory=dict) # used for trainer config
+    trainer_config: dict = Field(default_factory=dict) # used for trainer config

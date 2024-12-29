@@ -1,0 +1,11 @@
+pretrained_model: test_gpt2
+
+data_loader_config:
+  sources:
+    - name: test
+      source: test/rsc/test_oneline.jsonl
+      split:
+        type: predict
+      reader_fn: read_simple
+      prompt: llama31
+      dataset: BaseDataset
