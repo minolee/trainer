@@ -22,8 +22,10 @@ def list_dataset():
 
 @dataset
 class BaseDataset(D):
-    # read from KT style jsonl file, no passage used
-    # used for sft model
+    """
+    read from KT style jsonl file, no passage used
+    used for sft model
+    """
     def __init__(
         self, 
         data: Iterable[list[BaseMessage]], 

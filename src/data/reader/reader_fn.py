@@ -20,6 +20,7 @@ def list_reader_fn():
 @reader_fn
 @rank_iter
 def read_simple(source: str) -> Iterable[list[BaseMessage]]:
+    """jsonl file with dialogHistory key"""
     for item in read_magic(source):
         if "dialogHistory" not in item: continue
         yield [BaseMessage(**x) for x in item["dialogHistory"]]

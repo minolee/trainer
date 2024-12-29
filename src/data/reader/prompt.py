@@ -16,6 +16,7 @@ def list_prompt():
     return _prompts.keys()
 
 class PromptTemplate(BaseModel):
+    """Message를 LLM Prompt로 변환하는 데 사용하는 템플릿"""
     # dictionary + prompt template -> prompt
     # template(dialogues) -> prompt 가 되면 됨
     model_config = ConfigDict(extra="allow")
@@ -40,6 +41,7 @@ class PromptTemplate(BaseModel):
 
 @prompt
 class Llama31(PromptTemplate):
+    """Llama31 Prompt"""
     bot_token: str = "<|begin_of_text|>"
     eot_token: str = "<|eot_id|>"
     start_header_token: str = "<|start_header_id|>"

@@ -51,8 +51,9 @@ def read_yaml(f):
     with open(f, "r") as f:
         return yaml.safe_load(f)
 
-def read_magic(f):
-    ext = f.split(".")[-1]
+def read_magic(f, ext=None):
+    """File extension에 따라서 reader를 선택하여 읽어옴"""
+    ext = ext or f.split(".")[-1]
     return _reader_fn[f"read_{ext}"](f)
 
 @writer
@@ -83,6 +84,7 @@ def write_yaml(f, data):
     with open(f, "w", encoding="UTF8") as f:
         yaml.dump(data, f)
 
-def write_magic(f, data):
-    ext = f.split(".")[-1]
+def write_magic(f, data, ext=None):
+    """File extension에 따라서 writer를 선택하여 쓰기"""
+    ext = ext or f.split(".")[-1]
     return _writer_fn[f"write_{ext}"](f, data)

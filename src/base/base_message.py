@@ -4,6 +4,7 @@ from enum import Enum
 __all__ = ["Speaker", "BaseMessage", "PreferenceMessage"]
 
 class Speaker(Enum):
+    """Speaker 정보"""
     SYSTEM = "System"
     USER = "User"
     ASSISTANT = "Assistant"
@@ -16,6 +17,7 @@ class Speaker(Enum):
         return self.value
 
 class BaseMessage(BaseModel):
+    """LLM 학습에 사용하는 system - user - assistant의 대화를 나타내는 message class"""
     speaker: Speaker
     message: str
 
