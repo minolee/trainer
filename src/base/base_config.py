@@ -1,6 +1,5 @@
 from __future__ import annotations
-from pydantic import BaseModel, ConfigDict, Field
-from .base_deco import create_register_deco
+from pydantic import BaseModel, ConfigDict
 __all__ = ["BaseConfig", "DictConfig"]
 
 
@@ -10,7 +9,7 @@ class BaseConfig(BaseModel):
     supports yaml load and dump using OmegaConf.
     """
     model_config = ConfigDict(extra="allow")
-
+    
     def dump(self, path):
         from src.utils import write_magic
         write_magic(path, self.model_dump())
@@ -21,6 +20,6 @@ class BaseConfig(BaseModel):
         return cls(**read_magic(path)) # type: ignore
 
 class DictConfig(BaseConfig):
-    """base dictionary config"""
-    name: str
+    """함수 이름을 불러오고 kwarg를 전달하는데 사용하는 config"""
+    name: str # load할 때 사용할 이름. 함수나 class 이름 사용
     # any additional config follows

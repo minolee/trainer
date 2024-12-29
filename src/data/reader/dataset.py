@@ -3,7 +3,7 @@ from __future__ import annotations
 import torch
 from torch.utils.data import Dataset as D
 from transformers import PreTrainedTokenizer
-from src.base import create_register_deco, Speaker
+from src.base import create_register_deco, create_get_fn, Speaker
 from .prompt import get_prompt
 from .config import ReaderElem
 from src.base import BaseMessage
@@ -15,8 +15,7 @@ _dataset: dict[str, type[D]] = {}
 
 dataset = create_register_deco(_dataset)
 
-def get_dataset(name: str) -> type[D]:
-    return _dataset[name.lower()]
+get_dataset = create_get_fn(_dataset)
 
 def list_dataset():
     return _dataset.keys()
@@ -37,7 +36,7 @@ class BaseDataset(D):
         self.raw_data = data
         self.split = split
         self.tokenizer = tokenizer
-        self.prompt = get_prompt(config.prompt)(**(config.prompt_kwargs or {}))
+        self.prompt = get_prompt(config.prompt)()
         self.tokenized = []
         self.train_every_assistant_message = kwargs.get("train_every_assistant_message", False)
         

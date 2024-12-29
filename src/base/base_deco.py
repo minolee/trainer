@@ -1,9 +1,12 @@
 
-from functools import wraps
-
+from functools import wraps, partial
+from typing import TypeVar, Callable
+from .base_config import DictConfig
 import torch.distributed as dist
 
-__all__ = ["create_register_deco", "rank_iter"]
+__all__ = ["create_register_deco", "create_get_fn", "rank_iter"]
+
+T = TypeVar("T", bound=Callable)
 
 def create_register_deco(registry: dict):
     # 함수나 class 이름을 가지고 모듈에서 불러오고 싶을 때 사용
@@ -18,6 +21,16 @@ def create_register_deco(registry: dict):
             return fn(*args, **kwargs)
         return inner_fn
     return deco
+
+def create_get_fn(registry: dict[str, T]):
+    def get_fn(name: str | DictConfig) -> T | partial[T]:
+        if isinstance(name, str):
+            return registry[name.lower()]
+        elif isinstance(name, DictConfig):
+            kwargs = name.model_dump()
+            kwargs.pop("name")
+            return partial(registry[name.name.lower()], **kwargs)
+    return get_fn
 
 
 def rank_iter(fn):

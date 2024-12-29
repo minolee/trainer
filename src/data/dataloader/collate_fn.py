@@ -1,13 +1,12 @@
 import torch
-from src.base import create_register_deco
+from src.base import create_register_deco, create_get_fn
 _collate_fn = {}
 
 collate_fn = create_register_deco(_collate_fn)
 
 __all__ = ["get_collate_fn", "list_collate_fn"]
 
-def get_collate_fn(name: str):
-    return _collate_fn[name]
+get_collate_fn = create_get_fn(_collate_fn)
 
 def list_collate_fn():
     return _collate_fn.keys()

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from src.base import BaseConfig
+from src.base import BaseConfig, DictConfig
 from pathlib import Path
 from enum import Enum
+from pydantic import field_serializer
 
 class DataType(Enum):
     TRAIN = "train"
@@ -16,25 +17,27 @@ class ReaderConfig(BaseConfig):
     sources: list[ReaderElem]
 
     lazy: bool = False # load only when needed
-    default_reader_fn: str | None = None
-    default_dataset: str | None = None
-    default_prompt: str | None = None
+    default_reader_fn: str | DictConfig | None = None
+    default_dataset: str | DictConfig | None = None
+    default_prompt: str | DictConfig | None = None
 
 class ReaderElem(BaseConfig):
     name: str | None = None # name of data
     source: str # path to the data source
     split: SplitConfig
 
-    reader_fn: str | None = None # how to read raw file
-    prompt: str | None = None # how to convert raw data into middle structure
-    prompt_kwargs: dict | None = None # kwargs for prompt
-    dataset: str | None = None # which dataset to use
-    dataset_kwargs: dict | None = None # kwargs for dataset
+    reader_fn: str | DictConfig | None = None # how to read raw file
+    prompt: str | DictConfig | None = None # how to convert raw data into middle structure
+    dataset: str | DictConfig | None = None # which dataset to use
 
 class SplitConfig(BaseConfig):
     type: DataType = DataType.MIXED
     split_ratio: str | list[float | int] | None = None
     
+    @field_serializer("type")
+    def serialize_type(self, type: DataType) -> str:
+        return type.value
+
     def parse_split_ratio(self) -> list[int]:
         """
         parse split ratio into list of int

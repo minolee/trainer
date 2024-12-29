@@ -1,4 +1,4 @@
-
+"""데이터를 총괄하는 모듈"""
 from .reader import ReaderConfig, Reader, get_dataset, BaseDataset
 from .dataloader import DataLoaderConfig, get_collate_fn
 from ..tokenizer import TokenizerConfig, load_tokenizer

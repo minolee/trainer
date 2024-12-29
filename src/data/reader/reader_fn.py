@@ -3,7 +3,7 @@
 from __future__ import annotations
 from typing import Callable, Iterable
 from .prompt import get_prompt
-from src.base import create_register_deco, rank_iter, BaseMessage
+from src.base import create_register_deco, create_get_fn, rank_iter, BaseMessage
 from src.utils import read_magic
 
 __all__ = ["get_reader_fn", "list_reader_fn"]
@@ -13,9 +13,7 @@ ReaderFn = Callable[[str], Iterable[list[BaseMessage]]]
 _reader_fn: dict[str, ReaderFn] = {}
 reader_fn = create_register_deco(_reader_fn)
 
-def get_reader_fn(name: str) -> ReaderFn:
-    return _reader_fn[name]
-
+get_reader_fn = create_get_fn(_reader_fn)
 def list_reader_fn():
     return _reader_fn.keys()
 
@@ -23,4 +21,5 @@ def list_reader_fn():
 @rank_iter
 def read_simple(source: str) -> Iterable[list[BaseMessage]]:
     for item in read_magic(source):
+        if "dialogHistory" not in item: continue
         yield [BaseMessage(**x) for x in item["dialogHistory"]]

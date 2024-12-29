@@ -1,7 +1,7 @@
 """prompt for various tasks"""
 from __future__ import annotations
 from pydantic import BaseModel, ConfigDict
-from src.base import BaseMessage, create_register_deco
+from src.base import BaseMessage, create_register_deco, create_get_fn
 # how?
 # 지금 굉장히 더러워 보이는데 나중에 깔끔하게 만들어 보자..
 
@@ -10,8 +10,7 @@ __all__ = ["get_prompt", "list_prompt", "PromptTemplate"]
 _prompts: dict[str, type[PromptTemplate]] = {}
 prompt = create_register_deco(_prompts)
 
-def get_prompt(name: str) -> type[PromptTemplate]:
-    return _prompts[name.lower()]
+get_prompt = create_get_fn(_prompts)
 
 def list_prompt():
     return _prompts.keys()
