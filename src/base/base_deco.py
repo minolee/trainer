@@ -24,7 +24,7 @@ def create_register_deco(registry: dict):
         return inner_fn
     return deco
 
-def create_get_fn(registry: dict[str, T] | ModuleType):
+def create_get_fn(registry: dict[str, T] | ModuleType, *fallback_registry: dict[str, T] | ModuleType):
     """
     특정 registry에서 이름을 가지고 함수나 class를 불러오는 함수를 생성
 
@@ -41,17 +41,23 @@ def create_get_fn(registry: dict[str, T] | ModuleType):
         :return: 불러온 함수나 class. CallConfig를 사용한 경우 kwargs를 전달하여 partial 함수를 반환
         :rtype: T | partial[T]
         """
-        if isinstance(registry, dict):
-            name_getter = lambda name: registry[name.lower()] # type: ignore
-        elif isinstance(registry, ModuleType):
-            name_getter = lambda name: getattr(registry, name) # 여기서는 lower()를 사용하지 않음
-        else:
-            raise ValueError("registry should be dict or module")
-        
-        if isinstance(name, str):
-            return name_getter(name)
-        elif isinstance(name, CallConfig):
-            kwargs = name.model_dump()
-            kwargs.pop("name")
-            return partial(name_getter(name.name), **kwargs)
+        fn_target = name if isinstance(name, str) else name.name
+        for reg in [registry, *fallback_registry]:
+            if isinstance(reg, dict):
+                name_getter = lambda name: reg[name.lower()] # type: ignore
+            elif isinstance(reg, ModuleType):
+                name_getter = lambda name: getattr(reg, name) # 여기서는 lower()를 사용하지 않음
+            else:
+                raise ValueError("registry should be dict or module")
+            try:
+                if isinstance(name, str):
+                    return name_getter(name)
+                elif isinstance(name, CallConfig):
+                    kwargs = name.model_dump()
+                    kwargs.pop("name")
+                    return partial(name_getter(name.name), **kwargs)
+            except:
+                pass
+        raise ValueError(f"Name {fn_target} not found on every registry")
+            
     return get_fn
