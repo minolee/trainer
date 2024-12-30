@@ -68,9 +68,6 @@ class SplitConfig(BaseConfig):
     strategy: str | None = "cycle"
     split_ratio: str | list[float | int] | None = None
     
-    @field_serializer("type")
-    def serialize_type(self, type: DataType) -> str:
-        return type.value
 
     def parse_split_ratio(self) -> list[int]:
         """
@@ -81,13 +78,13 @@ class SplitConfig(BaseConfig):
         
         """
         match self.type:
-            case DataType.TRAIN:
+            case DataType.TRAIN.value:
                 return [1, 0, 0]
-            case DataType.DEV | DataType.VALIDATION:
+            case DataType.DEV.value | DataType.VALIDATION.value:
                 return [0, 1, 0]
-            case DataType.TEST | DataType.PREDICT:
+            case DataType.TEST.value | DataType.PREDICT.value:
                 return [0, 0, 1]
-            case DataType.MIXED:
+            case DataType.MIXED.value:
                 assert self.split_ratio is not None, "split_ratio is not defined"
                 split_ratio = self.split_ratio
                 if isinstance(split_ratio, str):

@@ -6,7 +6,7 @@ from transformers import PreTrainedTokenizer
 from src.base import create_register_deco, create_get_fn, Speaker
 from .prompt import get_prompt
 from .config import ReaderElem
-from src.base import BaseMessage
+from src.base import BaseMessage, DataElem
 from typing import Iterable
 
 __all__ = ["get_dataset", "list_dataset", "BaseDataset"]
@@ -28,7 +28,7 @@ class BaseDataset(D):
     """
     def __init__(
         self, 
-        data: Iterable[list[BaseMessage]], 
+        data: Iterable[DataElem], 
         split: str,
         config: ReaderElem,
         tokenizer: PreTrainedTokenizer,
@@ -44,6 +44,7 @@ class BaseDataset(D):
         
     def setup(self):
         for messages in self.raw_data:
+            messages = messages.elem
             # system message should be at the beginning
             if messages[0].speaker == Speaker.SYSTEM:
                 messages[0].message = self.prompt.system_prompt + "\n" + messages[0].message

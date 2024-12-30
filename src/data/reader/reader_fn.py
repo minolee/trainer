@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 from typing import Callable, Iterable
-from .prompt import get_prompt
-from src.base import create_register_deco, create_get_fn, BaseMessage
+from src.base import create_register_deco, create_get_fn, BaseMessage, DataElem
 from src.utils import read_magic, rank_iter
 
 __all__ = ["get_reader_fn", "list_reader_fn"]
@@ -19,8 +18,12 @@ def list_reader_fn():
 
 @reader_fn
 @rank_iter
-def read_simple(source: str) -> Iterable[list[BaseMessage]]:
+def read_simple(source: str) -> Iterable[DataElem]:
     """jsonl file with dialogHistory key"""
-    for item in read_magic(source):
+    for i, item in enumerate(read_magic(source)):
         if "dialogHistory" not in item: continue
-        yield [BaseMessage(**x) for x in item["dialogHistory"]]
+        yield DataElem(
+            data_source=source,
+            data_index=i,
+            elem=[BaseMessage(**x) for x in item["dialogHistory"]]
+        )

@@ -1,27 +1,25 @@
 from __future__ import annotations
 import torch
-import lightning as pl
 from .config import ModelConfig
-from src.base import create_get_fn
-from transformers import AutoModelForCausalLM, AutoConfig, PreTrainedModel
+from src.train import get_loss_fn
+from transformers import AutoModelForCausalLM, GenerationMixin
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeVar
+
+G = TypeVar("G", bound=(torch.nn.Module, GenerationMixin))
+
 if TYPE_CHECKING:
     from src.train import TrainConfig
     from src.inference import InferenceConfig
 
-get_loss_fn = create_get_fn(torch.nn)
-
-class BaseModel(pl.LightningModule):
+class BaseModel():
     """Base model for all model pipeline. can be used for sft model without modification"""
-    model: torch.nn.Module
+    model: G
     loss_fn: torch.nn.Module
     
-    def __init__(self, model_config: ModelConfig, *, train_config: TrainConfig | None = None, inference_config: InferenceConfig | None = None):
+    def __init__(self, model_config: ModelConfig):
         super().__init__()
         self.model_config = model_config
-        self.train_config = train_config
-        self.inference_config = inference_config
 
     def setup(self, stage: str):
         # load weights

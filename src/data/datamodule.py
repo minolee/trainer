@@ -2,7 +2,6 @@
 from .reader import ReaderConfig, Reader, get_dataset, BaseDataset
 from .dataloader import DataLoaderConfig, get_collate_fn
 from ..tokenizer import TokenizerConfig, load_tokenizer
-from lightning import LightningDataModule
 from torch.utils.data import Dataset, DataLoader, ConcatDataset
 from functools import partial
 from transformers import PreTrainedTokenizer
@@ -18,7 +17,7 @@ def create_dataloader(dataset: Dataset, config: DataLoaderConfig, tokenizer: Pre
         )
     )
 
-class DataModule(LightningDataModule):
+class DataModule:
     # LightningDataModule이 dataset이랑 dataloader를 합쳐놓은 것인데 dataset이랑 dataloader가 지금 분리돼있어서 어떻게 구현해야 좋을지 생각해 봐야 함
 
     def __init__(
@@ -48,15 +47,10 @@ class DataModule(LightningDataModule):
                 dataset = dataset_cls(dialogue, stage, config, self.tokenizer)
                 self.prepared[stage].append(dataset)
             
-    def setup(self, stage):
+    def setup(self, stage : str | list[str]):
         # stage: fit, validate, test, predict
-        stages = []
-        if stage == "fit":
-            stages = ["train", "dev"]
-        elif stage == "validate":
-            stages = ["dev"]
-        else:
-            stages = ["test"]
+        stages = [stage] if isinstance(stage, str) else stage
+        
         for stage in stages:
             if stage in self.processed: continue
             for dataset in self.prepared[stage]:
