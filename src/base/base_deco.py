@@ -2,6 +2,7 @@
 from functools import wraps, partial
 from typing import TypeVar, Callable
 from types import ModuleType
+import inspect
 from .base_config import CallConfig
 
 __all__ = ["create_register_deco", "create_get_fn"]
@@ -16,15 +17,22 @@ def create_register_deco(registry: dict):
     """
 
     def deco(fn):
-        global _reader_fn
         registry[fn.__name__.lower()] = fn
         @wraps(fn)
         def inner_fn(*args, **kwargs):
             return fn(*args, **kwargs)
         return inner_fn
+        # if inspect.isclass(fn):
+        #     inner_fn.__name__ = fn.__name__
+        #     inner_fn.__doc__ = fn.__doc__
+        #     inner_fn.__module__ = fn.__module__
+        #     return inner_fn
+        # else:
+        #     return wraps(fn)(inner_fn)
     return deco
 
-def create_get_fn(registry: dict[str, T] | ModuleType, *fallback_registry: dict[str, T] | ModuleType):
+
+def create_get_fn(registry: dict[str, T] | ModuleType, *fallback_registry: dict[str, T] | ModuleType) -> Callable[..., T]:
     """
     특정 registry에서 이름을 가지고 함수나 class를 불러오는 함수를 생성
 
@@ -60,4 +68,4 @@ def create_get_fn(registry: dict[str, T] | ModuleType, *fallback_registry: dict[
                 pass
         raise ValueError(f"Name {fn_target} not found on every registry")
             
-    return get_fn
+    return get_fn # type: ignore

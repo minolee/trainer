@@ -4,18 +4,20 @@ import torch
 from torch.utils.data import Dataset as D
 from transformers import PreTrainedTokenizer
 from src.base import create_register_deco, create_get_fn, Speaker
-from .prompt import get_prompt
-from .config import ReaderElem
+from .prompt import PromptTemplate
 from src.base import BaseMessage, DataElem
 from typing import Iterable
 
-__all__ = ["get_dataset", "list_dataset", "BaseDataset"]
+__all__ = ["list_dataset", "BaseDataset"]
 
 _dataset: dict[str, type[D]] = {}
 
 dataset = create_register_deco(_dataset)
 
+
 get_dataset = create_get_fn(_dataset)
+
+
 
 def list_dataset():
     return _dataset.keys()
@@ -30,15 +32,14 @@ class BaseDataset(D):
         self, 
         data: Iterable[DataElem], 
         split: str,
-        config: ReaderElem,
+        prompt: PromptTemplate,
         tokenizer: PreTrainedTokenizer,
         **kwargs
     ):
-        assert config.prompt
         self.raw_data = data
         self.split = split
         self.tokenizer = tokenizer
-        self.prompt = get_prompt(config.prompt)()
+        self.prompt = prompt
         self.tokenized = []
         self.train_every_assistant_message = kwargs.get("train_every_assistant_message", False)
         
@@ -72,8 +73,6 @@ class BaseDataset(D):
                     "attention_mask": attention_mask,
                     "label": label
                 }
-                if self.split == "dev":
-                    del d["loss_mask"]
                 self.tokenized.append(d)
             elif self.split == "test":
                 input_ids = []

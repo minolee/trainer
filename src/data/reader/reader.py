@@ -1,43 +1,29 @@
-# read raw file and split into train-dev-test
-from .config import ReaderConfig, ReaderElem
-from src.base import BaseMessage
-from .reader_fn import get_reader_fn
-from typing import Iterable
-__all__ = ['Reader']
+# add any raw data processing logic here
 
-# type definition
-Dialogue = list[BaseMessage]
-Corpus = list[Dialogue]
+from __future__ import annotations
+from typing import Callable, Iterable
+from src.base import create_register_deco, create_get_fn, BaseMessage, DataElem
+from src.utils import read_magic, rank_iter
 
-class Reader:
-    def __init__(self, config: ReaderConfig):
-        self.config = config
-        self.corpus: dict[str, list[tuple[Corpus, ReaderElem]]] = {} # store raw data
-    
-    def load_corpus(self):
-        # set default value for reader_fn and prompt
-        for source in self.config.sources:
-            if source.reader_fn is None:
-                source.reader_fn = self.config.default_reader_fn
-            if source.prompt is None:
-                source.prompt = self.config.default_prompt
-            if source.dataset is None:
-                source.dataset = self.config.default_dataset
-        # load corpus
-        corpus = {
-            "train": [],
-            "dev": [],
-            "test": []
-        }
-        for source in self.config.sources:
-            # raw data에 dataset loading function을 함께 묶어놔야 하는데..?
-            # 와 진짜 못생겼다 어떡하냐
-            train, dev, test = source.split(source.read())
-            corpus["train"].append((train, source))
-            corpus["dev"].append((dev, source))
-            corpus["test"].append((test, source))
-        self.corpus = corpus
+__all__ = ["get_reader", "list_reader"]
 
-    
-    def __getitem__(self, split):
-        return self.corpus[split]
+ReaderFn = Callable[[str], Iterable[DataElem]]
+
+_reader_fn: dict[str, ReaderFn] = {}
+reader = create_register_deco(_reader_fn)
+
+get_reader = create_get_fn(_reader_fn)
+def list_reader():
+    return _reader_fn.keys()
+
+@reader
+@rank_iter
+def read_simple(source: str) -> Iterable[DataElem]:
+    """jsonl file with dialogHistory key"""
+    for i, item in enumerate(read_magic(source)):
+        if "dialogHistory" not in item: continue
+        yield DataElem(
+            data_source=source,
+            data_index=i,
+            elem=[BaseMessage(**x) for x in item["dialogHistory"]]
+        )

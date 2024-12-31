@@ -10,6 +10,7 @@ class ModelConfig(BaseConfig):
     device: str = "cuda" # device to use
 
     def __call__(self) -> torch.nn.Module:
+        """load model from config"""
         if self.weight_path is not None:
             if self.weight_path == "scratch":
                 model = AutoModelForCausalLM.from_config(self.base_config) # does not load weights

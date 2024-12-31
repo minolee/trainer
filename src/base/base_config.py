@@ -1,18 +1,22 @@
 from __future__ import annotations
+from math import e
 from pydantic import BaseModel, ConfigDict
 __all__ = ["BaseConfig", "CallConfig"]
 
 
 class BaseConfig(BaseModel):
     """
-    base config for all pipeline.
-    supports yaml or json load and dump.
+    모든 pipeline에 사용되는 config의 base class
+    yaml 또는 json 파일로부터 load와 dump 지원.
+
+    __call__을 구현하면 해당 config를 사용하여 각 파이프라인에 필요한 실제 동작이 실행되는 방식으로 구현할 것
+
     """
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="allow", use_enum_values=True)
     
     def dump(self, path):
         from src.utils import write_magic
-        write_magic(path, self.model_dump())
+        write_magic(path, self.model_dump(exclude_none=True))
     
     @classmethod
     def load(cls, path):
@@ -25,3 +29,6 @@ class CallConfig(BaseConfig):
     """load할 때 사용할 이름. 함수나 class 이름 사용"""
 
     # any additional config follows
+
+    def __repr__(self):
+        return self.name
