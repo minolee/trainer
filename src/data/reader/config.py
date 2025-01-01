@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from src.base import BaseConfig, CallConfig, DataElem
+from src.utils import world_size
 from .reader import get_reader
 from enum import Enum
 from typing import Iterable, TypeVar
@@ -66,6 +67,8 @@ class ReaderElem(BaseConfig):
     """데이터셋 경로"""
     split: SplitConfig
     """데이터셋 분할 방법"""
+    limit: int | None = None
+    """설정시 데이터셋 총량 제한"""
 
     reader: str | CallConfig | None = None
     """Raw data를 Message 형태로 변환하는 함수"""
@@ -80,9 +83,12 @@ class ReaderElem(BaseConfig):
         """Read and split data"""
         # read -> split
         assert self.reader is not None, f"reader_fn of {self.name or self.source} is not defined"
-
         reader = get_reader(self.reader)
+        
         load_buf = list(reader(self.source)) # type: ignore
+        if self.limit and self.limit > 0:
+            ws = world_size()
+            load_buf = load_buf[:self.limit // ws]
         self.split_buf = {k: v for k, v in zip(["train", "dev", "test"], self.split(load_buf))}
     
     
@@ -151,6 +157,7 @@ class SplitConfig(BaseConfig):
                     c = 0
                     idx += 1
                     idx %= 3
+                    continue
                 line = next(it)
                 split_data[idx].append(line)
                 c += 1

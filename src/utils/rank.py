@@ -1,6 +1,15 @@
 from functools import wraps
 import torch.distributed as dist
-__all__ = ["is_rank_zero", "rank_zero_only", "rank_iter"]
+__all__ = ["rank", "world_size", "is_rank_zero", "rank_zero_only", "rank_iter"]
+
+def rank():
+    if not dist.is_initialized(): return 0
+    return dist.get_rank()
+
+def world_size():
+    if not dist.is_initialized(): return 1
+    return dist.get_world_size()
+
 def is_rank_zero():
     # check if this is main process(rank 0), works for all distributed
     return not dist.is_initialized() or dist.get_rank() == 0
