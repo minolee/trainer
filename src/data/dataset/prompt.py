@@ -2,6 +2,8 @@
 from __future__ import annotations
 from pydantic import BaseModel, ConfigDict
 from src.base import BaseMessage, create_register_deco, create_get_fn
+from typing import Callable
+import sys
 # how?
 # 지금 굉장히 더러워 보이는데 나중에 깔끔하게 만들어 보자..
 
@@ -10,7 +12,7 @@ __all__ = ["get_prompt", "list_prompt", "PromptTemplate"]
 _prompts: dict[str, type[PromptTemplate]] = {}
 prompt = create_register_deco(_prompts)
 
-get_prompt = create_get_fn(_prompts)
+get_prompt: Callable[[str], type[PromptTemplate]] = create_get_fn(sys.modules[__name__])
 
 def list_prompt():
     return _prompts.keys()
@@ -39,7 +41,6 @@ class PromptTemplate(BaseModel):
     def wrap(self, message: BaseMessage) -> str:
         raise NotImplemented
 
-@prompt
 class Llama31(PromptTemplate):
     """Llama31 Prompt"""
     bot_token: str = "<|begin_of_text|>"
@@ -56,4 +57,3 @@ You are a helpful assistant"""
 
     def wrap(self, message: BaseMessage):
         return f"{self.start_header_token}{message.speaker}{self.end_header_token}{message.message}{self.eot_token}"
-    

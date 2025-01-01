@@ -1,17 +1,15 @@
 import torch
 from src.base import create_register_deco, create_get_fn
+import sys
 __all__ = ["get_collate_fn", "list_collate_fn"]
 _collate_fn = {}
 
-collate_fn = create_register_deco(_collate_fn)
 
-
-get_collate_fn = create_get_fn(_collate_fn)
+get_collate_fn = create_get_fn(sys.modules[__name__])
 
 def list_collate_fn():
     return _collate_fn.keys()
 
-@collate_fn
 def base_collate_fn(batch: list[dict[str, torch.Tensor]], pad_id, padding_side="left"):
     result = {k: [] for k in batch[0].keys()}
     if isinstance(pad_id, int):

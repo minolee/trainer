@@ -15,6 +15,6 @@ class DatasetConfig(BaseConfig):
     """Dataset class"""
 
     def __call__(self, stage: str, data: list[DataElem], tokenizer: PreTrainedTokenizer):
-        prompt_cls = get_prompt(self.prompt)()
+        prompt_cls = get_prompt(self.prompt)() # type: ignore
         dataset_cls = get_dataset(self.dataset)
         return dataset_cls(data, stage, prompt_cls, tokenizer) # type: ignore

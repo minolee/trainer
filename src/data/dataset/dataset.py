@@ -7,22 +7,17 @@ from src.base import create_register_deco, create_get_fn, Speaker
 from .prompt import PromptTemplate
 from src.base import BaseMessage, DataElem
 from typing import Iterable
-
-__all__ = ["list_dataset", "BaseDataset"]
+import sys
+__all__ = ["get_dataset", "list_dataset", "BaseDataset"]
 
 _dataset: dict[str, type[D]] = {}
 
-dataset = create_register_deco(_dataset)
-
-
-get_dataset = create_get_fn(_dataset)
-
+get_dataset = create_get_fn(sys.modules[__name__])
 
 
 def list_dataset():
     return _dataset.keys()
 
-@dataset
 class BaseDataset(D):
     """
     read from KT style jsonl file, no passage used
@@ -98,10 +93,8 @@ class BaseDataset(D):
         return self.tokenized[idx]
 
 
-@dataset
 class PreferenceDataset(D):
     ...
 
-@dataset
 class PackingDataset(D):
     ...
