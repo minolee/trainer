@@ -6,22 +6,23 @@ reader_config:
       source: rsc/data/AiHub-Largeai_SFT_QA.jsonl
       split:
         type: train
+      limit: 100
       reader: read_simple
 
 dataset_config:
-  prompt: llama31
+  prompt: Llama31
   dataset: BaseDataset
 
 dataloader_config:
   shuffle: false
-  num_workers: 0 # currently not working with num_workers > 0
-  batch_size: 4
+  num_workers: 8 # currently not working with num_workers > 0
+  batch_size: 2
 tokenizer_config:
   from_pretrained: openai-community/gpt2
 
 model_load_config:
   base_config: openai-community/gpt2
-  device: mps
+  device: cpu
 
 
 loss_config:
@@ -39,4 +40,5 @@ scheduler_config:
   t_total: 1000
 
 trainer_config:
-  num_train_epochs: 3
+  num_train_epochs: 1
+  gradient_accumulation_steps: 4

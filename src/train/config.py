@@ -46,6 +46,19 @@ class TrainConfig(BaseConfig):
         datamodule.setup(["train", "dev"]) # type: ignore
 
         model = self.model_load_config()
+        # print model summary
+        # 모델의 모든 파라미터를 가져옵니다.
+        params = list(model.parameters())
+
+        # 전체 파라미터 수를 계산합니다.
+        total_params = sum(p.numel() for p in params)
+
+        # 학습 가능한(gradient를 계산하는) 파라미터 수를 계산합니다.
+        trainable_params = sum(p.numel() for p in params if p.requires_grad)
+
+        # 결과를 출력합니다.
+        print(f"전체 파라미터 수: {total_params}")
+        print(f"학습 가능한 파라미터 수: {trainable_params}")
         loss_fn: torch.nn.Module = get_loss_fn(self.loss_config)() # type: ignore
         tc = self.trainer_config
         name = self.model_name
@@ -62,7 +75,7 @@ class TrainConfig(BaseConfig):
             def get_test_dataloader(self):
                 return datamodule.test_dataloader()
 
-            def training_step(self, model, batch, *_):
+            def compute_loss(self, model, batch, *_, **__):
                 inp_tensor = {k: v.to(model.device) for k, v in batch.items()}
                 label = inp_tensor.pop("label")
                 logits = self.model(**inp_tensor).logits

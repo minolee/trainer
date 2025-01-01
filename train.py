@@ -7,7 +7,7 @@ import argparse
 
 from src.env import MODEL_SAVE_DIR
 from src.train.config import TrainConfig
-
+import gc
 
 def main(
     config: TrainConfig
@@ -17,6 +17,7 @@ def main(
     # model = config.model_load_config()
 
     trainer = config()
+    gc.collect()
     
     trainer.train()
     config.model_load_config.weight_path = str(os.path.join(save_dir, "model.pt"))

@@ -4,5 +4,5 @@
 import os
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
-os.environ["PYTORCH_MPS_HIGH_WATERMARK_RATIO"] = "0.0"
+# os.environ["PYTORCH_MPS_HIGH_WATERMARK_RATIO"] = "0.0"
 MODEL_SAVE_DIR = "rsc/model"
