@@ -42,7 +42,7 @@ class TrainConfig(BaseConfig):
             self.tokenizer_config
         )
         base_trainer: type[transformers.Trainer] = get_trainer(self.base_trainer)
-        datamodule.prepare_data()
+        datamodule.prepare_data(["train", "dev"])
         datamodule.setup(["train", "dev"]) # type: ignore
 
         model = self.model_load_config()

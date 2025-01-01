@@ -29,12 +29,11 @@ class DataModule:
         
         self.tokenizer: PreTrainedTokenizer = tokenizer_config() # type: ignore
     
-    def prepare_data(self):
+    def prepare_data(self, stage: str | list[str]):
         print("Preparing data")
         self.reader_config()
         self.reader_config.info()
-        
-        stages = ["train", "dev", "test"]
+        stages = [stage] if isinstance(stage, str) else stage
         for stage in stages:
             self.prepared[stage] = []
             target_data = self.reader_config[stage]
@@ -47,10 +46,8 @@ class DataModule:
         stages = [stage] if isinstance(stage, str) else stage
         
         for stage in stages:
-            if stage in self.processed: continue
             for dataset in self.prepared[stage]:
                 dataset.setup()
-            self.processed[stage] = ConcatDataset(self.prepared[stage])
     
     @rank_zero_only
     def info(self, stage: str | list[str] | None = None):
@@ -65,10 +62,10 @@ class DataModule:
 
     
     def train_dataloader(self):
-        return self.dataloader_config(self.processed["train"], self.tokenizer)
+        return self.dataloader_config(ConcatDataset(self.prepared["train"]), self.tokenizer)
 
     def val_dataloader(self):
-        return self.dataloader_config(self.processed["dev"], self.tokenizer)
+        return self.dataloader_config(ConcatDataset(self.prepared["dev"]), self.tokenizer)
 
     def test_dataloader(self):
-        return self.dataloader_config(self.processed["test"], self.tokenizer)
+        return self.dataloader_config(ConcatDataset(self.prepared["test"]), self.tokenizer)
