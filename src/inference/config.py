@@ -3,24 +3,72 @@ from __future__ import annotations
 from src.base import BaseConfig, CallConfig
 
 from src.data.reader import ReaderConfig
+from src.data.dataset import DatasetConfig
 from src.data.dataloader import DataLoaderConfig
+from src.data import DataModule
 from src.tokenizer import TokenizerConfig
 from src.model import ModelConfig
+from src.train import TrainConfig
+from src.env import MODEL_SAVE_DIR
+from transformers import GenerationConfig as G
+import os
+from pydantic import Field
 
 __all__ = ["InferenceConfig"]
 
 class InferenceConfig(BaseConfig):
 
-    pretrained_model: str # model path or pretrained model card on huggingface
+    pretrained_model: str | None = None 
+    """학습한 모델의 경로 또는 huggingface의 pretrained model card"""
+    model: ModelConfig | None = None
+    """pretrained_model이 없는 경우 model config"""
 
-    data_loader_config: ReaderConfig
-    data_processor_config: DataLoaderConfig
+    tokenizer: TokenizerConfig | None = None
+    """pretrained_model이 없는 경우 tokenizer config"""
 
-    generation_config: GenerationConfig
+    # data configs
+    reader: ReaderConfig
+    dataset: DatasetConfig
+    dataloader: DataLoaderConfig
 
-    output_config: str
+    # generation configs
+    # generation이 아니라면? 일단은 그냥 놔두고 나중에 task 분리 필요할 듯?
+    generation_config: GenerationConfig = Field(default_factory=lambda: GenerationConfig())
+    logit_processors: list[str | CallConfig] = Field(default_factory=list)
+    output_config: str | None = None
 
     # deepspeed_config: DeepSpeedConfig | None = None
+    def __call__(self):
+        # 얘는 call하면 뭘 return해야 되냐..?
+        # 일단 setup까지 하는 것은 확정인데
+        if self.pretrained_model:
+            if os.path.exists((path:=os.path.join(MODEL_SAVE_DIR, self.pretrained_model, "config.yaml"))):
+                c = TrainConfig.load(path)
+                model_config = c.model
+                tokenizer_config = c.tokenizer
+            else:
+                model_config = ModelConfig(base_config=self.pretrained_model)
+                tokenizer_config = TokenizerConfig(from_pretrained=self.pretrained_model)
+        else:
+            assert self.model and self.tokenizer
+            model_config = self.model
+            tokenizer_config = self.tokenizer
+        
+        datamodule = DataModule(
+            self.reader,
+            self.dataset,
+            self.dataloader,
+            tokenizer_config
+        )
+        datamodule.info()
+        model = model_config()
+        model.eval()
+
+
+        datamodule.prepare_data(["predict"])
+        datamodule.setup(["predict"])
+
+        return model.generate()
 
 class GenerationConfig(BaseConfig):
     """Huggingface generation config를 따름. 정의되지 않은 값은 모델의 generation config를 가져온다.
@@ -50,7 +98,5 @@ class GenerationConfig(BaseConfig):
     # top_k: int | None = None
     # top_p: float | None = None
     # min_p: float | None = None
-
-
-    def model_dump(self):
-        return super().model_dump(exclude_none=True)
+    def __call__(self):
+        return G(**self.model_dump())

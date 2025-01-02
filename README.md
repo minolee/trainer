@@ -7,7 +7,7 @@
 python >= 3.10
 
 ## Run
-`python [train | inference | evaluation].py --config <config_path>`
+`python run.py --mode [train | inference | evaluation] --config <config_path>`
 
 ## Deeper inside
 데이터 준비, 모델 준비, 학습/추론/평가 준비 -> 실행 의 과정으로 이루어져 있습니다.
@@ -20,14 +20,14 @@ TrainConfig, InferenceConfig, EvaluationConfig는 모두 다른 형식을 가지
 ## 공통과정
 ### Data 준비
 
-### 학습 준비
+## 학습 준비
 
-### Inference 준비
+## Inference 준비
 
-### Evaluation 준비
+## Evaluation 준비
 
-## Checklist
-
+## TODO LIST
+* Interactive
 
 ## Author
 - Minho Lee

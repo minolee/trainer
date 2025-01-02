@@ -1,0 +1,19 @@
+pretrained_model: test_gpt2
+
+reader:
+  sources:
+    - name: test
+      source: test/rsc/test_oneline.jsonl
+      split:
+        type: predict
+      reader: read_simple
+  
+
+dataset:
+  prompt: Llama31
+  dataset: BaseDataset
+
+dataloader:
+  shuffle: false
+  num_workers: 0 # num_workers > 0이면 메모리 더 나감
+  batch_size: 1
