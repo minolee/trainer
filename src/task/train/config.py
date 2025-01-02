@@ -17,6 +17,8 @@ import os
 get_trainer = create_get_fn(transformers, trl) # type: ignore
 
 def create_trainer(config: TrainConfig):
+    name = config.model_name
+    train_args = transformers.TrainingArguments(f"{MODEL_SAVE_DIR}/{name}", **config.training_arguments.model_dump()) # deepspeed init here
     datamodule = DataModule(
         config.reader,
         config.dataset,
@@ -42,10 +44,10 @@ def create_trainer(config: TrainConfig):
     print(f"전체 파라미터 수: {total_params}")
     print(f"학습 가능한 파라미터 수: {trainable_params}")
     loss_fn: torch.nn.Module = get_loss_fn(config.loss_config)() # type: ignore
-    name = config.model_name
+    
     class _Trainer(base_trainer):
         def __init__(self):
-            super().__init__(model, transformers.TrainingArguments(f"{MODEL_SAVE_DIR}/{name}", **config.trainer_config))
+            super().__init__(model, train_args)
         
         def get_train_dataloader(self):
             return datamodule["train"]
@@ -79,7 +81,7 @@ class TrainConfig(BaseConfig):
     optimizer_config: CallConfig
     scheduler_config: CallConfig
 
-    trainer_config: dict = Field(default_factory=dict) 
+    training_arguments: BaseConfig = Field(default_factory=lambda: BaseConfig())
     """used for hf trainer config. check https://huggingface.co/docs/transformers/v4.47.1/en/main_classes/trainer#transformers.TrainingArguments"""
 
 
