@@ -5,7 +5,7 @@ __all__ = ["get_collate_fn", "list_collate_fn"]
 _collate_fn = {}
 
 
-get_collate_fn = create_get_fn(sys.modules[__name__])
+get_collate_fn = create_get_fn(__name__)
 
 def list_collate_fn():
     return _collate_fn.keys()

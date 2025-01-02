@@ -85,7 +85,7 @@ class ReaderElem(BaseConfig):
         assert self.reader is not None, f"reader_fn of {self.name or self.source} is not defined"
         reader = get_reader(self.reader)
         
-        load_buf = list(reader(self.source)) # type: ignore
+        load_buf = list(reader(self.source))
         if self.limit and self.limit > 0:
             ws = world_size()
             load_buf = load_buf[:self.limit // ws]

@@ -18,9 +18,9 @@ def main(
 
     trainer = config()
     gc.collect()
-    
+
     trainer.train()
-    config.model_load_config.weight_path = str(os.path.join(save_dir, "model.pt"))
+    config.model.weight_path = str(os.path.join(save_dir, "model.pt"))
     config.dump(os.path.join(save_dir, "config.yaml"))
     
     trainer.save_model(save_dir)

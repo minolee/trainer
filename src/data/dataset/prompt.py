@@ -7,15 +7,8 @@ import sys
 # how?
 # 지금 굉장히 더러워 보이는데 나중에 깔끔하게 만들어 보자..
 
-__all__ = ["get_prompt", "list_prompt", "PromptTemplate"]
+__all__ = ["get_prompt", "PromptTemplate"]
 
-_prompts: dict[str, type[PromptTemplate]] = {}
-prompt = create_register_deco(_prompts)
-
-get_prompt: Callable[[str], type[PromptTemplate]] = create_get_fn(sys.modules[__name__])
-
-def list_prompt():
-    return _prompts.keys()
 
 class PromptTemplate(BaseModel):
     """Message를 LLM Prompt로 변환하는 데 사용하는 템플릿"""
@@ -57,3 +50,6 @@ You are a helpful assistant"""
 
     def wrap(self, message: BaseMessage):
         return f"{self.start_header_token}{message.speaker}{self.end_header_token}{message.message}{self.eot_token}"
+
+
+get_prompt = create_get_fn(__name__, type_hint=PromptTemplate)

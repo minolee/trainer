@@ -4,7 +4,7 @@ from typing import TypeVar, Callable
 from types import ModuleType
 import inspect
 from .base_config import CallConfig
-
+import sys
 __all__ = ["create_register_deco", "create_get_fn"]
 
 T = TypeVar("T", bound=Callable)
@@ -37,13 +37,18 @@ def create_register_deco(registry: dict):
     return deco
 
 
-def create_get_fn(registry: dict[str, T] | ModuleType, *fallback_registry: dict[str, T] | ModuleType) -> Callable[..., T]:
+def create_get_fn(*name: str | ModuleType, type_hint: T | None = None) -> Callable[[str | CallConfig], T]:
     """
     특정 registry에서 이름을 가지고 함수나 class를 불러오는 함수를 생성
+
+    get_fn = create_get_fn(module_name)
+    inst = get_fn(instance_name)
 
     :param registry: 모듈 또는 create_register_deco에 사용한 dict
     :type registry: dict[str, T] | ModuleType
     """
+
+    registry = [sys.modules[x] if isinstance(x, str) else x for x in name]
     def get_fn(name: str | CallConfig) -> T | partial[T]:
         """
         이름 또는 CallConfig를 사용하여 함수나 class를 불러옴
@@ -55,7 +60,7 @@ def create_get_fn(registry: dict[str, T] | ModuleType, *fallback_registry: dict[
         :rtype: T | partial[T]
         """
         fn_target = name if isinstance(name, str) else name.name
-        for reg in [registry, *fallback_registry]:
+        for reg in registry:
             if isinstance(reg, dict):
                 name_getter = lambda name: reg[name] # type: ignore
             elif isinstance(reg, ModuleType):
@@ -72,5 +77,4 @@ def create_get_fn(registry: dict[str, T] | ModuleType, *fallback_registry: dict[
             except:
                 pass
         raise ValueError(f"Name {fn_target} not found on every registry")
-            
     return get_fn # type: ignore

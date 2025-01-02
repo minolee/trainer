@@ -20,11 +20,11 @@ class TrainConfig(BaseConfig):
     model_name: str # 모델이 저장될 이름, 이 path에 저장됨
     base_trainer: str | CallConfig = "Trainer"
     
-    reader_config: ReaderConfig
-    dataset_config: DatasetConfig
-    dataloader_config: DataLoaderConfig
-    tokenizer_config: TokenizerConfig
-    model_load_config: ModelConfig # model_config가 안되는거 실화냐
+    reader: ReaderConfig
+    dataset: DatasetConfig
+    dataloader: DataLoaderConfig
+    tokenizer: TokenizerConfig
+    model: ModelConfig # model_config가 안되는거 실화냐
 
     loss_config: CallConfig
     optimizer_config: CallConfig
@@ -36,16 +36,16 @@ class TrainConfig(BaseConfig):
 
     def __call__(self) -> transformers.Trainer:
         datamodule = DataModule(
-            self.reader_config,
-            self.dataset_config,
-            self.dataloader_config,
-            self.tokenizer_config
+            self.reader,
+            self.dataset,
+            self.dataloader,
+            self.tokenizer
         )
         base_trainer: type[transformers.Trainer] = get_trainer(self.base_trainer)
         datamodule.prepare_data(["train", "dev"])
         datamodule.setup(["train", "dev"]) # type: ignore
 
-        model = self.model_load_config()
+        model = self.model()
         # print model summary
         # 모델의 모든 파라미터를 가져옵니다.
         params = list(model.parameters())

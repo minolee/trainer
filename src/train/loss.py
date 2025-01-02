@@ -2,19 +2,11 @@ from venv import create
 from src.base import create_register_deco, create_get_fn
 import torch
 import torch.nn.functional as F
-__all__ = ["get_loss_fn", "list_loss_fn"]
-
-_loss_fn: dict[str, type[torch.nn.Module]] = {}
-
-loss_fn = create_register_deco(_loss_fn)
-
-get_loss_fn = create_get_fn(_loss_fn, torch.nn)
+__all__ = ["get_loss_fn"]
 
 
-def list_loss_fn():
-    return _loss_fn.keys()
+get_loss_fn = create_get_fn(__name__, torch.nn)
 
-@loss_fn
 class DPOLoss(torch.nn.Module):
     def __init__(self, beta, loss_type, *args, **kwargs):
         super().__init__()

@@ -8,15 +8,11 @@ from .prompt import PromptTemplate
 from src.base import BaseMessage, DataElem
 from typing import Iterable
 import sys
-__all__ = ["get_dataset", "list_dataset", "BaseDataset"]
-
-_dataset: dict[str, type[D]] = {}
-
-get_dataset = create_get_fn(sys.modules[__name__])
+__all__ = ["get_dataset", "BaseDataset"]
 
 
-def list_dataset():
-    return _dataset.keys()
+get_dataset = create_get_fn(__name__, type_hint=D)
+
 
 class BaseDataset(D):
     """
@@ -45,7 +41,7 @@ class BaseDataset(D):
             if messages[0].speaker == Speaker.SYSTEM:
                 messages[0].message = self.prompt.system_prompt + "\n" + messages[0].message
             else:
-                messages.insert(0, BaseMessage(speaker="system", message=self.prompt.system_prompt))
+                messages.insert(0, BaseMessage(speaker=Speaker.SYSTEM, message=self.prompt.system_prompt))
             # 학습 split별로 다른 처리 진행
             if self.split in ["train", "dev"]:
                 input_ids = []
@@ -53,11 +49,11 @@ class BaseDataset(D):
                 loss_mask = []
                 for i, message in enumerate(messages):
                     tok = self.tokenizer(self.prompt.wrap(message), return_tensors="pt")
-                    input_ids.append(tok["input_ids"].squeeze())
-                    attention_mask.append(tok["attention_mask"].squeeze())
+                    input_ids.append(tok["input_ids"].squeeze()) # type: ignore
+                    attention_mask.append(tok["attention_mask"].squeeze()) # type: ignore
                     loss_mask.append(torch.tensor([
                         message.speaker.type == "Assistant" and (self.train_every_assistant_message or i == len(messages) - 1)
-                    ] * tok["input_ids"].shape[-1]))
+                    ] * tok["input_ids"].shape[-1])) # type: ignore
                 input_ids = torch.cat(input_ids, dim=0)[:-1] # exclude final eot token
                 attention_mask = torch.cat(attention_mask, dim=0)[:-1]
                 loss_mask = torch.cat(loss_mask, dim=0)[:-1]
@@ -69,13 +65,13 @@ class BaseDataset(D):
                     "label": label
                 }
                 self.tokenized.append(d)
-            elif self.split == "test":
+            elif self.split in ["test", "predict"]:
                 input_ids = []
                 attention_mask = []
                 for message in messages[:-1]: # last message is used as target
                     tok = self.tokenizer(self.prompt.wrap(message), return_tensors="pt")
-                    input_ids.append(tok["input_ids"].squeeze())
-                    attention_mask.append(tok["attention_mask"].squeeze())
+                    input_ids.append(tok["input_ids"].squeeze()) # type: ignore
+                    attention_mask.append(tok["attention_mask"].squeeze()) # type: ignore
                 inference_header_tok = self.tokenizer(self.prompt.inference_header(messages[-1].speaker), return_tensors="pt")
                 input_ids.append(inference_header_tok["input_ids"].squeeze())
                 attention_mask.append(inference_header_tok["attention_mask"].squeeze())
