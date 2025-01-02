@@ -1,0 +1,72 @@
+
+model_name: test_gpt2
+reader:
+  sources:
+    - name: test
+      source: rsc/data/AiHub-Largeai_SFT_QA.jsonl
+      split:
+        type: train
+      limit: 50
+      reader: read_simple
+    # - name: test2
+    #   source: rsc/data/single_lines.jsonl
+    #   split:
+    #     type: train
+    #   limit: 100
+    #   reader: read_simple
+
+
+dataset:
+  prompt: Llama31
+  dataset: BaseDataset
+
+dataloader:
+  shuffle: false
+  num_workers: 0 # num_workers > 0이면 메모리 더 나감
+  batch_size: 1
+tokenizer:
+  from_pretrained: openai-community/gpt2
+
+model:
+  base_config: openai-community/gpt2
+  device: cpu
+
+
+loss_config:
+  name: CrossEntropyLoss
+  ignore_index: -100
+
+optimizer_config:
+  name: AdamW
+  lr: 5e-5
+  weight_decay: 0.01
+
+scheduler_config:
+  name: WarmupLinearSchedule
+  warmup_steps: 100
+  t_total: 1000
+
+trainer_config:
+  num_train_epochs: 1
+  gradient_accumulation_steps: 4
+  report_to: tensorboard
+  deepspeed_config:
+    zero_optimization:
+      stage: 3
+      offload_param:
+        device: cpu
+        pin_memory: true
+      offload_optimizer:
+        device: cpu
+        pin_memory: true
+      
+    train_micro_batch_size_per_gpu: 4
+    gradient_accumulation_steps: 4
+    gradient_clipping: 1.0
+    fp16:
+      enabled: true
+      initial_scale_power: 16
+      loss_scale_window: 1000
+      hysteresis: 2
+      min_loss_scale: 1
+      loss_scale: 0
