@@ -3,17 +3,23 @@ pretrained_model: test_gpt2
 reader:
   sources:
     - name: test
-      source: test/rsc/test_oneline.jsonl
+      source: rsc/data/single_lines.jsonl
       split:
         type: predict
       reader: read_simple
+      limit: 20
   
 
 dataset:
   prompt: Llama31
-  dataset: BaseDataset
+  dataset: 
+    name: BaseDataset
+    max_length: 1024
 
 dataloader:
   shuffle: false
   num_workers: 0 # num_workers > 0이면 메모리 더 나감
-  batch_size: 1
+  batch_size: 8
+
+generation_config:
+  max_new_tokens: 100

@@ -25,6 +25,7 @@ class BaseDataset(D):
         split: str,
         prompt: PromptTemplate,
         tokenizer: PreTrainedTokenizer,
+        max_length: int,
         **kwargs
     ):
         self.raw_data = data
@@ -32,6 +33,7 @@ class BaseDataset(D):
         self.tokenizer = tokenizer
         self.prompt = prompt
         self.tokenized = []
+        self.max_length = max_length
         self.train_every_assistant_message = kwargs.get("train_every_assistant_message", False)
         
     def setup(self):
@@ -64,6 +66,8 @@ class BaseDataset(D):
                     "attention_mask": attention_mask,
                     "label": label
                 }
+                if input_ids.shape[0] > self.max_length:
+                    continue
                 self.tokenized.append(d)
             elif self.split in ["test", "predict"]:
                 input_ids = []
@@ -77,6 +81,7 @@ class BaseDataset(D):
                 attention_mask.append(inference_header_tok["attention_mask"].squeeze())
                 input_ids = torch.cat(input_ids, dim=0)
                 attention_mask = torch.cat(attention_mask, dim=0)
+                if input_ids.shape[0] > self.max_length: continue
                 self.tokenized.append({
                     "input_ids": input_ids,
                     "attention_mask": attention_mask

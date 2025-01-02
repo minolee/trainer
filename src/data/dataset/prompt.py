@@ -1,7 +1,7 @@
 """prompt for various tasks"""
 from __future__ import annotations
 from pydantic import BaseModel, ConfigDict
-from src.base import BaseMessage, create_register_deco, create_get_fn
+from src.base import BaseMessage, create_get_fn, Speaker
 from typing import Callable
 import sys
 # how?
@@ -28,7 +28,7 @@ class PromptTemplate(BaseModel):
     def sync_tokenizer(self, tokenizer):
         pass
     
-    def inference_header(self, speaker=None):
+    def inference_header(self, speaker: Speaker):
         raise NotImplemented
 
     def wrap(self, message: BaseMessage) -> str:
@@ -45,11 +45,21 @@ Today Date: 23 July 2024
 
 You are a helpful assistant"""
 
-    def inference_header(self, speaker=None):
-        return f"{self.start_header_token}{speaker or self.assistant_name}{self.end_header_token}"
+    def inference_header(self, speaker: Speaker):
+        return f"{self.start_header_token}{speaker.value}{self.end_header_token}"
 
     def wrap(self, message: BaseMessage):
-        return f"{self.start_header_token}{message.speaker}{self.end_header_token}{message.message}{self.eot_token}"
+        return f"{self.start_header_token}{message.speaker.value}{self.end_header_token}{message.message}{self.eot_token}"
 
+class Gemma(PromptTemplate):
+    start_header_token: str = "<start_of_turn>"
+    end_header_token: str = "<end_of_turn>"
+    assistant_name: str = "model"
+
+    def inference_header(self, speaker: Speaker):
+        return f"{self.start_header_token}{speaker.value}\n"
+    
+    def wrap(self, message: BaseMessage):
+        return f"{self.start_header_token}{message.speaker.value}\n{message.message}{self.end_header_token}"
 
 get_prompt = create_get_fn(__name__, type_hint=PromptTemplate)

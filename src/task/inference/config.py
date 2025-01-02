@@ -66,15 +66,17 @@ class InferenceConfig(BaseConfig):
         model: transformers.GenerationMixin | torch.nn.Module = model_config()
         model.eval()
 
-        datamodule.prepare_data(["predict"])
-        datamodule.setup(["predict"])
+        datamodule.prepare_data(["test"])
+        datamodule.setup(["test"])
         datamodule.info()
         result = []
         generation_config = self.generation_config()
-        for batch in datamodule["predict"]:
+        for batch in datamodule["test"]:
             batch = {k: v.to(model.device) for k, v in batch.items()}
-            generated = model.generate(batch, generation_config)
-            result.extend(tokenizer.decode_batch(generated))
+            
+            generated = model.generate(batch["input_ids"], generation_config, attention_mask=batch["attention_mask"])
+            for gen in generated:
+                result.append(tokenizer.decode(gen, skip_special_tokens=True))
         print(result) 
 
 class GenerationConfig(BaseConfig):
