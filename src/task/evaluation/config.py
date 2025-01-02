@@ -1,5 +1,5 @@
 from src.base import BaseConfig
-from src.inference import InferenceConfig
+from src.task.inference import InferenceConfig
 __all__ = ["EvaluationConfig"]
 
 class EvaluationConfig(BaseConfig):
