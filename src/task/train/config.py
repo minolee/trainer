@@ -48,13 +48,13 @@ def create_trainer(config: TrainConfig):
             super().__init__(model, transformers.TrainingArguments(f"{MODEL_SAVE_DIR}/{name}", **config.trainer_config))
         
         def get_train_dataloader(self):
-            return datamodule.train_dataloader()
+            return datamodule["train"]
         
         def get_eval_dataloader(self):
-            return datamodule.val_dataloader()
+            return datamodule["dev"]
         
         def get_test_dataloader(self):
-            return datamodule.test_dataloader()
+            return datamodule["test"]
 
         def compute_loss(self, model, batch, *_, **__):
             inp_tensor = {k: v.to(model.device) for k, v in batch.items()}

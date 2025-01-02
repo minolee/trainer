@@ -8,3 +8,4 @@ lightning_logs
 .vscode/
 !test/rsc
 key.json
+unused/

@@ -6,3 +6,5 @@ import os
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 # os.environ["PYTORCH_MPS_HIGH_WATERMARK_RATIO"] = "0.0"
 MODEL_SAVE_DIR = "rsc/model"
+INFERENCE_SAVE_DIR = "rsc/inference"
+EVALUATION_SAVE_DIR = "rsc/evaluation"

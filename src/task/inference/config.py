@@ -8,17 +8,18 @@ from src.data.dataloader import DataLoaderConfig
 from src.data import DataModule
 from src.tokenizer import TokenizerConfig
 from src.model import ModelConfig
-from src.train import TrainConfig
+from src.task.train import TrainConfig
 from src.env import MODEL_SAVE_DIR
-from transformers import GenerationConfig as G
+import transformers
+import torch
 import os
 from pydantic import Field
-
+from datetime import datetime
 __all__ = ["InferenceConfig"]
 
 class InferenceConfig(BaseConfig):
 
-    pretrained_model: str | None = None 
+    pretrained_model: str | None = None
     """학습한 모델의 경로 또는 huggingface의 pretrained model card"""
     model: ModelConfig | None = None
     """pretrained_model이 없는 경우 model config"""
@@ -26,6 +27,7 @@ class InferenceConfig(BaseConfig):
     tokenizer: TokenizerConfig | None = None
     """pretrained_model이 없는 경우 tokenizer config"""
 
+    experiment_name: str = Field(default_factory=lambda: datetime.strftime(datetime.now(), "%Y%M%d_%H%m%s"))
     # data configs
     reader: ReaderConfig
     dataset: DatasetConfig
@@ -60,15 +62,20 @@ class InferenceConfig(BaseConfig):
             self.dataloader,
             tokenizer_config
         )
-        datamodule.info()
-        model = model_config()
+        tokenizer = datamodule.tokenizer
+        model: transformers.GenerationMixin | torch.nn.Module = model_config()
         model.eval()
-
 
         datamodule.prepare_data(["predict"])
         datamodule.setup(["predict"])
-
-        return model.generate()
+        datamodule.info()
+        result = []
+        generation_config = self.generation_config()
+        for batch in datamodule["predict"]:
+            batch = {k: v.to(model.device) for k, v in batch.items()}
+            generated = model.generate(batch, generation_config)
+            result.extend(tokenizer.decode_batch(generated))
+        print(result) 
 
 class GenerationConfig(BaseConfig):
     """Huggingface generation config를 따름. 정의되지 않은 값은 모델의 generation config를 가져온다.
@@ -99,4 +106,4 @@ class GenerationConfig(BaseConfig):
     # top_p: float | None = None
     # min_p: float | None = None
     def __call__(self):
-        return G(**self.model_dump())
+        return transformers.GenerationConfig(**self.model_dump())

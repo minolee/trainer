@@ -61,12 +61,6 @@ class DataModule:
                     print(f"Dataset: {dataset.__class__.__name__}")
                     print(f"Number of data: {len(dataset)}")
 
+    def __getitem__(self, key: str):
+        return self.dataloader_config(ConcatDataset(self.prepared[key]), self.tokenizer)
     
-    def train_dataloader(self):
-        return self.dataloader_config(ConcatDataset(self.prepared["train"]), self.tokenizer)
-
-    def val_dataloader(self):
-        return self.dataloader_config(ConcatDataset(self.prepared["dev"]), self.tokenizer)
-
-    def test_dataloader(self):
-        return self.dataloader_config(ConcatDataset(self.prepared["test"]), self.tokenizer)
