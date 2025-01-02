@@ -14,7 +14,7 @@ class ModelConfig(BaseConfig):
         if self.weight_path is not None:
             if self.weight_path == "scratch":
                 model = AutoModelForCausalLM.from_config(self.base_config) # does not load weights
-            model.load_state_dict(torch.load(self.weight_path))
+            model = AutoModelForCausalLM.from_pretrained(self.weight_path)
         else:
             model = AutoModelForCausalLM.from_pretrained(self.base_config)
         

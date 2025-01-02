@@ -1,26 +1,33 @@
 
 model_name: test_gpt2
-reader_config:
+reader:
   sources:
     - name: test
       source: rsc/data/AiHub-Largeai_SFT_QA.jsonl
       split:
         type: train
-      limit: 100
+      limit: 50
       reader: read_simple
+    # - name: test2
+    #   source: rsc/data/single_lines.jsonl
+    #   split:
+    #     type: train
+    #   limit: 100
+    #   reader: read_simple
 
-dataset_config:
+
+dataset:
   prompt: Llama31
   dataset: BaseDataset
 
-dataloader_config:
+dataloader:
   shuffle: false
-  num_workers: 8 # currently not working with num_workers > 0
-  batch_size: 2
-tokenizer_config:
+  num_workers: 0 # num_workers > 0이면 메모리 더 나감
+  batch_size: 1
+tokenizer:
   from_pretrained: openai-community/gpt2
 
-model_load_config:
+model:
   base_config: openai-community/gpt2
   device: cpu
 

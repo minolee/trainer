@@ -1,3 +1,4 @@
+from __future__ import annotations
 from src.base import BaseConfig, CallConfig, create_get_fn
 from src.data import DataModule
 from src.data.reader import ReaderConfig
@@ -11,9 +12,57 @@ from pydantic import Field
 
 import transformers
 import trl
+import os
 
 get_trainer = create_get_fn(transformers, trl) # type: ignore
 
+def create_trainer(config: TrainConfig):
+    datamodule = DataModule(
+        config.reader,
+        config.dataset,
+        config.dataloader,
+        config.tokenizer
+    )
+    base_trainer: type[transformers.Trainer] = get_trainer(config.base_trainer)
+    datamodule.prepare_data(["train", "dev"])
+    datamodule.setup(["train", "dev"]) # type: ignore
+    datamodule.info()
+    model = config.model()
+    # print model summary
+    # 모델의 모든 파라미터를 가져옵니다.
+    params = list(model.parameters())
+
+    # 전체 파라미터 수를 계산합니다.
+    total_params = sum(p.numel() for p in params)
+
+    # 학습 가능한(gradient를 계산하는) 파라미터 수를 계산합니다.
+    trainable_params = sum(p.numel() for p in params if p.requires_grad)
+
+    # 결과를 출력합니다.
+    print(f"전체 파라미터 수: {total_params}")
+    print(f"학습 가능한 파라미터 수: {trainable_params}")
+    loss_fn: torch.nn.Module = get_loss_fn(config.loss_config)() # type: ignore
+    name = config.model_name
+    class _Trainer(base_trainer):
+        def __init__(self):
+            super().__init__(model, transformers.TrainingArguments(f"{MODEL_SAVE_DIR}/{name}", **config.trainer_config))
+        
+        def get_train_dataloader(self):
+            return datamodule.train_dataloader()
+        
+        def get_eval_dataloader(self):
+            return datamodule.val_dataloader()
+        
+        def get_test_dataloader(self):
+            return datamodule.test_dataloader()
+
+        def compute_loss(self, model, batch, *_, **__):
+            inp_tensor = {k: v.to(model.device) for k, v in batch.items()}
+            label = inp_tensor.pop("label")
+            logits = self.model(**inp_tensor).logits
+            loss = loss_fn(logits.view(-1, logits.shape[-1]), label.view(-1))
+            return loss
+    return _Trainer()
 
 class TrainConfig(BaseConfig):
 
@@ -34,52 +83,14 @@ class TrainConfig(BaseConfig):
     """used for hf trainer config. check https://huggingface.co/docs/transformers/v4.47.1/en/main_classes/trainer#transformers.TrainingArguments"""
 
 
-    def __call__(self) -> transformers.Trainer:
-        datamodule = DataModule(
-            self.reader,
-            self.dataset,
-            self.dataloader,
-            self.tokenizer
-        )
-        base_trainer: type[transformers.Trainer] = get_trainer(self.base_trainer)
-        datamodule.prepare_data(["train", "dev"])
-        datamodule.setup(["train", "dev"]) # type: ignore
+    def __call__(self):
+        # trainer를 return하는 대신 그냥 train process 전체를 총괄해 버리는 것이 깔끔할 듯
+        save_dir = os.path.join(MODEL_SAVE_DIR, self.model_name)
+        os.makedirs(save_dir, exist_ok=True)
+        trainer = create_trainer(self)
 
-        model = self.model()
-        # print model summary
-        # 모델의 모든 파라미터를 가져옵니다.
-        params = list(model.parameters())
-
-        # 전체 파라미터 수를 계산합니다.
-        total_params = sum(p.numel() for p in params)
-
-        # 학습 가능한(gradient를 계산하는) 파라미터 수를 계산합니다.
-        trainable_params = sum(p.numel() for p in params if p.requires_grad)
-
-        # 결과를 출력합니다.
-        print(f"전체 파라미터 수: {total_params}")
-        print(f"학습 가능한 파라미터 수: {trainable_params}")
-        loss_fn: torch.nn.Module = get_loss_fn(self.loss_config)() # type: ignore
-        tc = self.trainer_config
-        name = self.model_name
-        class _Trainer(base_trainer):
-            def __init__(self):
-                super().__init__(model, transformers.TrainingArguments(f"{MODEL_SAVE_DIR}/{name}", **tc))
-            
-            def get_train_dataloader(self):
-                return datamodule.train_dataloader()
-            
-            def get_eval_dataloader(self):
-                return datamodule.val_dataloader()
-            
-            def get_test_dataloader(self):
-                return datamodule.test_dataloader()
-
-            def compute_loss(self, model, batch, *_, **__):
-                inp_tensor = {k: v.to(model.device) for k, v in batch.items()}
-                label = inp_tensor.pop("label")
-                logits = self.model(**inp_tensor).logits
-                loss = loss_fn(logits.view(-1, logits.shape[-1]), label.view(-1))
-                return loss
+        trainer.train()
+        self.model.weight_path = save_dir
+        self.dump(os.path.join(save_dir, "config.yaml"))
         
-        return _Trainer()
+        trainer.save_model(save_dir)

@@ -55,10 +55,11 @@ class DataModule:
             stage = ["train", "dev", "test"]
         stages = [stage] if isinstance(stage, str) else stage
         for stage in stages:
-            print(f"Stage: {stage}")
-            for dataset in self.prepared[stage]:
-                print(f"Dataset: {dataset.__class__.__name__}")
-                print(f"Number of data: {len(dataset)}")
+            if stage in self.prepared:
+                print(f"Stage: {stage}")
+                for dataset in self.prepared[stage]:
+                    print(f"Dataset: {dataset.__class__.__name__}")
+                    print(f"Number of data: {len(dataset)}")
 
     
     def train_dataloader(self):
