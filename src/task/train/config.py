@@ -14,7 +14,7 @@ import transformers
 import trl
 import os
 
-get_trainer = create_get_fn(transformers, trl) # type: ignore
+get_trainer = create_get_fn(transformers, trl, type_hint=transformers.Trainer)
 
 def create_trainer(config: TrainConfig):
     name = config.model_name
@@ -75,7 +75,7 @@ class TrainConfig(BaseConfig):
     dataset: DatasetConfig
     dataloader: DataLoaderConfig
     tokenizer: TokenizerConfig
-    model: ModelConfig # model_config가 안되는거 실화냐
+    model: ModelConfig
 
     loss_config: CallConfig
     optimizer_config: CallConfig

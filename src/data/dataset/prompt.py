@@ -62,4 +62,17 @@ class Gemma(PromptTemplate):
     def wrap(self, message: BaseMessage):
         return f"{self.start_header_token}{message.speaker.value}\n{message.message}{self.end_header_token}"
 
+class Qwen2(PromptTemplate):
+    start_header_token: str = "<|im_start|>"
+    system_name: str = "system\n"
+    user_name: str = "user\n"
+    assistant_name: str = "assistant\n"
+    end_header_token: str = "<|im_end|>"
+
+    def inference_header(self, speaker: Speaker):
+        return f"{self.start_header_token}{speaker.value}\n"
+
+    def wrap(self, message: BaseMessage):
+        return f"{self.start_header_token}{message.speaker.value}\n{message.message}{self.end_header_token}\n"
+
 get_prompt = create_get_fn(__name__, type_hint=PromptTemplate)

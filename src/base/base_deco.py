@@ -2,7 +2,6 @@
 from functools import wraps, partial
 from typing import TypeVar, Callable
 from types import ModuleType
-import inspect
 from .base_config import CallConfig
 import sys
 __all__ = ["create_register_deco", "create_get_fn"]
@@ -41,10 +40,14 @@ def create_get_fn(*name: str | ModuleType, type_hint: T | None = None) -> Callab
     """
     특정 registry에서 이름을 가지고 함수나 class를 불러오는 함수를 생성
 
-    get_fn = create_get_fn(module_name)
-    inst = get_fn(instance_name)
+    >>> get_fn = create_get_fn(module_name)
+    >>> inst = get_fn(instance_name)
 
+
+    함수에 대한 type hint를 지정하려면 typing의 Callable이나 Protocol을 사용하는 대신, dummy 함수를 만든 뒤 해당 함수를 type_hint에 전달해 주세요
+    
     :param registry: 모듈 또는 create_register_deco에 사용한 dict
+    :param type_hint: 불러올 함수나 class의 type hint, optional
     :type registry: dict[str, T] | ModuleType
     """
 

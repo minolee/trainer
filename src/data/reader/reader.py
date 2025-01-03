@@ -8,7 +8,11 @@ from src.utils import read_magic, rank_iter
 
 __all__ = ["get_reader"]
 
-get_reader = create_get_fn(__name__)
+@rank_iter
+def reader_type(source: str) -> Iterable[DataElem]:
+    ...
+
+get_reader = create_get_fn(__name__, type_hint=reader_type) # 이게되네
 
 @rank_iter
 def read_simple(source: str) -> Iterable[DataElem]:
