@@ -41,4 +41,4 @@ class BaseMessage(BaseModel):
         return str(self)
 
 class PreferenceMessage(BaseMessage):
-    content_b: str
+    rejected_message: str
