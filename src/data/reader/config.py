@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from src.base import BaseConfig, CallConfig, DataElem
-from src.utils import world_size
+from src.utils import world_size, rank_zero_only
 from .reader import get_reader
 from enum import Enum
 from typing import Iterable, TypeVar
@@ -46,7 +46,8 @@ class ReaderConfig(BaseConfig):
             if key in source:
                 result.extend(source[key])
         return result
-
+    
+    @rank_zero_only
     def info(self):
         print("###################")
         print("#### DATA INFO ####")

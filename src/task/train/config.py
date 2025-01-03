@@ -7,6 +7,7 @@ from src.data.dataloader import DataLoaderConfig
 from src.model import ModelConfig
 from src.tokenizer import TokenizerConfig
 from src.env import MODEL_SAVE_DIR
+from src.utils import world_size, is_rank_zero
 from .loss import get_loss_fn
 from pydantic import Field
 
@@ -20,13 +21,16 @@ get_optimizer = create_get_fn(torch.optim, type_hint=torch.optim.Optimizer)
 
 def create_trainer(config: TrainConfig):
     name = config.model_name
-
+    per_device_train_batch_size = getattr(config.training_arguments, "per_device_train_batch_size", 8)
+    config.dataloader.batch_size = per_device_train_batch_size
+    if hasattr(config.training_arguments, "deepspeed"):
+        config.training_arguments.deepspeed["train_micro_batch_size_per_gpu"] = per_device_train_batch_size # type: ignore
     train_args = transformers.TrainingArguments(f"{MODEL_SAVE_DIR}/{name}", **config.training_arguments.model_dump()) # deepspeed init here
     if config.optimizer:
         train_args.set_optimizer(**config.optimizer.model_dump())
     if config.scheduler:
         train_args.set_lr_scheduler(**config.scheduler.model_dump())
-    
+    model = config.model()
     datamodule = DataModule(
         config.reader,
         config.dataset,
@@ -37,20 +41,22 @@ def create_trainer(config: TrainConfig):
     datamodule.prepare_data(["train", "dev"])
     datamodule.setup(["train", "dev"]) # type: ignore
     datamodule.info()
-    model = config.model()
+    
     # print model summary
     # 모델의 모든 파라미터를 가져옵니다.
-    params = list(model.parameters())
+    if world_size() == 1:
+        params = list(model.parameters())
 
-    # 전체 파라미터 수를 계산합니다.
-    total_params = sum(p.numel() for p in params)
+        # 전체 파라미터 수를 계산합니다.
+        total_params = sum(p.numel() for p in params)
 
-    # 학습 가능한(gradient를 계산하는) 파라미터 수를 계산합니다.
-    trainable_params = sum(p.numel() for p in params if p.requires_grad)
+        # 학습 가능한(gradient를 계산하는) 파라미터 수를 계산합니다.
+        trainable_params = sum(p.numel() for p in params if p.requires_grad)
 
-    # 결과를 출력합니다.
-    print(f"전체 파라미터 수: {total_params}")
-    print(f"학습 가능한 파라미터 수: {trainable_params}")
+        # 결과를 출력합니다.
+        print(f"전체 파라미터 수: {total_params}")
+        print(f"학습 가능한 파라미터 수: {trainable_params}")
+
     loss_fn: torch.nn.Module = get_loss_fn(config.loss)() # type: ignore
     
     class _Trainer(base_trainer):

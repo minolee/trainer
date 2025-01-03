@@ -33,6 +33,9 @@ class BaseDataset(D):
         # setup logic
         raise NotImplementedError
 
+    def __len__(self):
+        return 0
+
 get_dataset = create_get_fn(__name__, type_hint=BaseDataset)
 
 

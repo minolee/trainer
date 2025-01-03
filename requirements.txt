@@ -5,4 +5,5 @@ tokenizers
 transformers
 accelerate
 deepspeed; platform_system == "Linux"
+mpi4py; platform_system == "Linux"
 trl

@@ -7,9 +7,7 @@ from functools import partial
 __all__ = ["DataLoaderConfig"]
 
 class DataLoaderConfig(BaseConfig):
-    
-    max_length: int = 4096 # TODO 여기다 하는게 아님
-    batch_size: int = 32
+    batch_size: int | None = None
     num_workers: int = 0 # base: single process
     shuffle: bool = True
     sampler: str | CallConfig | None = None # TODO

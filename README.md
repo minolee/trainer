@@ -11,6 +11,8 @@
 # How to run
 `python run.py --mode [train | inference | evaluation] --config <config_path>`
 
+Deepspeed 사용 시 `deepspeed --num_gpus X run.py --mode [train | inference | evaluation] --config <config_path>`
+
 ## Deeper inside
 데이터 준비, 모델 준비, 학습/추론/평가 준비 -> 실행 의 과정으로 이루어져 있습니다.
 
@@ -62,7 +64,9 @@ Dataset을 받아 DataLoader를 만드는 과정을 제어합니다. 이 과정�
 ### 모델 준비
 모델은 3가지 로딩 방식이 있습니다.
 
-* 
+* load from hub
+* load from local
+* load from scratch
 
 
 ## 학습 준비
@@ -87,7 +91,7 @@ Task나 필요에 따라 추가적인 class를 정의해야 할 수 있습니다
 ## TODO LIST
 우선순위별 정리
 
-* Deepspeed 적용 (진행중)
+* <strike>Deepspeed 적용</strike> (완료)
 * Callbacks
 * Peft
 * RL
