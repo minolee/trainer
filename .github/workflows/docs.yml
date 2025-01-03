@@ -3,7 +3,7 @@ name: Build and Deploy Docs
 on:
   push:
     branches:
-      - docs
+      - main
   # 필요하다면 pull_request 등 다른 트리거를 추가할 수도 있습니다.
   # pull_request:
   #   branches:
