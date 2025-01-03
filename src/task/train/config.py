@@ -20,7 +20,13 @@ get_optimizer = create_get_fn(torch.optim, type_hint=torch.optim.Optimizer)
 
 def create_trainer(config: TrainConfig):
     name = config.model_name
+
     train_args = transformers.TrainingArguments(f"{MODEL_SAVE_DIR}/{name}", **config.training_arguments.model_dump()) # deepspeed init here
+    if config.optimizer:
+        train_args.set_optimizer(**config.optimizer.model_dump())
+    if config.scheduler:
+        train_args.set_lr_scheduler(**config.scheduler.model_dump())
+    
     datamodule = DataModule(
         config.reader,
         config.dataset,

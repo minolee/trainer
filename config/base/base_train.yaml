@@ -34,14 +34,13 @@ loss:
   ignore_index: -100
 
 optimizer:
-  name: AdamW
-  lr: 5e-5
+  name: adamw_hf
+  learning_rate: 5.0e-05
   weight_decay: 0.01
 
 scheduler:
-  name: WarmupLinearSchedule
-  warmup_steps: 100
-  t_total: 1000
+  name: linear
+  warmup_ratio: 0.1
 
 training_arguments:
   num_train_epochs: 1

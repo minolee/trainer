@@ -16,10 +16,10 @@ class PromptTemplate(BaseModel):
     # template(dialogues) -> prompt 가 되면 됨
     model_config = ConfigDict(extra="allow")
 
-    bot_token: str
-    eot_token: str
-    start_header_token: str
-    end_header_token: str
+    bot_token: str | None = None
+    eot_token: str | None = None
+    start_header_token: str | None = None
+    end_header_token: str | None = None
 
     system_name: str = "system"
     user_name: str = "user"
@@ -51,11 +51,13 @@ You are a helpful assistant"""
     def wrap(self, message: BaseMessage):
         return f"{self.start_header_token}{message.speaker.value}{self.end_header_token}{message.message}{self.eot_token}"
 
-class Gemma(PromptTemplate):
+class Gemma2(PromptTemplate):
+    bot_token: str = "<bos>"
+    eot_token: str = "<eos>"
     start_header_token: str = "<start_of_turn>"
     end_header_token: str = "<end_of_turn>"
     assistant_name: str = "model"
-
+    system_prompt: str = ""
     def inference_header(self, speaker: Speaker):
         return f"{self.start_header_token}{speaker.value}\n"
     
