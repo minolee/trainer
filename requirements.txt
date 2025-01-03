@@ -4,4 +4,5 @@ pydantic
 tokenizers
 transformers
 accelerate
+deepspeed; platform_system == "Linux"
 trl
