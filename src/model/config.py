@@ -1,22 +1,27 @@
 from src.base import BaseConfig
-from transformers import AutoModelForCausalLM
-import torch
+from transformers import AutoConfig, AutoModelForCausalLM, PreTrainedModel
 __all__ = ["ModelConfig"]
 
 class ModelConfig(BaseConfig):
-    base_config: str # huggingface model card or path to config file
+    path: str
+    """huggingface model card or path to config file"""
+
+    model_type: str | None = None
+    """모델의 타입, 실제 코드에서는 사용하지 않고 기록용으로만 사용함. model init 과정에서 덮어씌워짐"""
     # check https://huggingface.co/docs/transformers/v4.39.3/en/model_doc/auto#transformers.AutoConfig.from_pretrained
-    weight_path: str | None = None # path to model weight, if None, will use pretrained weight. If set to "scratch", will not load weight
+    load_weight: bool = True
+    """if false, will load model without weights"""
     device: str = "cuda" # device to use
 
-    def __call__(self) -> torch.nn.Module:
+    def __call__(self) -> PreTrainedModel:
         """load model from config"""
-        if self.weight_path is not None:
-            if self.weight_path == "scratch":
-                model = AutoModelForCausalLM.from_config(self.base_config) # does not load weights
-            model = AutoModelForCausalLM.from_pretrained(self.weight_path)
+        if not self.load_weight:
+            model = AutoModelForCausalLM.from_config(
+                AutoConfig.from_pretrained(self.path)
+            ) # does not load weights
         else:
-            model = AutoModelForCausalLM.from_pretrained(self.base_config)
+            model = AutoModelForCausalLM.from_pretrained(self.path)
         
         model.to(self.device) # type: ignore
+        self.model_type = getattr(model.config, "model_type", "unknown")
         return model

@@ -92,7 +92,8 @@ class TrainConfig(BaseConfig):
         trainer = create_trainer(self)
 
         trainer.train()
-        self.model.weight_path = save_dir
+        self.model.path = save_dir
         self.dump(os.path.join(save_dir, "config.yaml"))
         
         trainer.save_model(save_dir)
+        

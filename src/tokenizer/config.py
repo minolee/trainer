@@ -3,7 +3,7 @@ from transformers import AutoTokenizer
 __all__ = ["TokenizerConfig"]
 
 class TokenizerConfig(BaseConfig):
-    from_pretrained: str
+    path: str
     
     def __call__(self):
-        return AutoTokenizer.from_pretrained(self.from_pretrained)
+        return AutoTokenizer.from_pretrained(self.path)

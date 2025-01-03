@@ -18,17 +18,19 @@ reader:
 
 dataset:
   prompt: Llama31
-  dataset: BaseDataset
+  dataset: 
+    name: BaseDataset
+    max_length: 1024
 
 dataloader:
-  shuffle: false
+  shuffle: true
   num_workers: 0 # num_workers > 0이면 메모리 더 나감
   batch_size: 1
 tokenizer:
-  from_pretrained: openai-community/gpt2
+  path: openai-community/gpt2
 
 model:
-  base_config: openai-community/gpt2
+  path: openai-community/gpt2
   device: cpu
 
 
