@@ -8,18 +8,13 @@ reader:
         type: train
       limit: 50
       reader: read_simple
-    # - name: test2
-    #   source: rsc/data/single_lines.jsonl
-    #   split:
-    #     type: train
-    #   limit: 100
-    #   reader: read_simple
+
 
 
 dataset:
   prompt: Llama31
   dataset: 
-    name: BaseDataset
+    name: SFTDataset
     max_length: 1024
 
 dataloader:
@@ -34,20 +29,20 @@ model:
   device: cpu
 
 
-loss_config:
+loss:
   name: CrossEntropyLoss
   ignore_index: -100
 
-optimizer_config:
+optimizer:
   name: AdamW
   lr: 5e-5
   weight_decay: 0.01
 
-scheduler_config:
+scheduler:
   name: WarmupLinearSchedule
   warmup_steps: 100
   t_total: 1000
 
-trainer_config:
+training_arguments:
   num_train_epochs: 1
   gradient_accumulation_steps: 4
