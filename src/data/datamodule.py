@@ -5,7 +5,6 @@ from .dataloader import DataLoaderConfig
 from src.tokenizer import TokenizerConfig
 from src.utils import rank_zero_only
 from torch.utils.data import Dataset, ConcatDataset
-from functools import partial
 from transformers import PreTrainedTokenizer
 __all__ = ['DataModule']
 

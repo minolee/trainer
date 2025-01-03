@@ -1,7 +1,7 @@
 # add any raw data processing logic here
 
 from __future__ import annotations
-from typing import Callable, Iterable
+from typing import Iterable
 from src.base import create_get_fn, BaseMessage, PreferenceMessage, DataElem
 from src.utils import read_magic, rank_iter
 

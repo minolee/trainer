@@ -1,4 +1,3 @@
-from pydantic import Field
 from .collate_fn import get_collate_fn
 from src.base import BaseConfig, CallConfig
 from torch.utils.data import Dataset, DataLoader

@@ -1,5 +1,5 @@
 import torch
-from src.base import create_register_deco, create_get_fn
+from src.base import create_get_fn
 import sys
 __all__ = ["get_collate_fn"]
 

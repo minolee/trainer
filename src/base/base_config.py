@@ -1,5 +1,4 @@
 from __future__ import annotations
-from math import e
 from pydantic import BaseModel, ConfigDict
 __all__ = ["BaseConfig", "CallConfig"]
 

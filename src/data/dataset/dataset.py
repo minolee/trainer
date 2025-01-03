@@ -3,7 +3,7 @@ from __future__ import annotations
 import torch
 from torch.utils.data import Dataset as D
 from transformers import PreTrainedTokenizer
-from src.base import create_register_deco, create_get_fn, Speaker
+from src.base import create_get_fn, Speaker
 from .prompt import PromptTemplate
 from src.base import BaseMessage, DataElem
 from typing import Iterable

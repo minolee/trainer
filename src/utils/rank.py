@@ -1,5 +1,4 @@
 from functools import wraps
-import torch.distributed as dist
 import os
 __all__ = ["rank", "world_size", "is_rank_zero", "rank_zero_only", "rank_iter"]
 

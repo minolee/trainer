@@ -20,6 +20,7 @@ get_trainer = create_get_fn(transformers, trl, type_hint=transformers.Trainer)
 get_optimizer = create_get_fn(torch.optim, type_hint=torch.optim.Optimizer)
 
 def create_trainer(config: TrainConfig):
+    """Config를 사용하여 Trainer를 생성합니다. Deepspeed config가 있을 경우 필요한 설정을 추가합니다."""
     name = config.model_name
     per_device_train_batch_size = getattr(config.training_arguments, "per_device_train_batch_size", 8)
     config.dataloader.batch_size = per_device_train_batch_size
@@ -97,11 +98,11 @@ class TrainConfig(BaseConfig):
     scheduler: CallConfig | None = None
 
     training_arguments: BaseConfig = Field(default_factory=lambda: BaseConfig())
-    """used for hf trainer config. check https://huggingface.co/docs/transformers/v4.47.1/en/main_classes/trainer#transformers.TrainingArguments"""
+    """hf trainer config. check https://huggingface.co/docs/transformers/v4.47.1/en/main_classes/trainer#transformers.TrainingArguments"""
 
 
     def __call__(self):
-        # trainer를 return하는 대신 그냥 train process 전체를 총괄해 버리는 것이 깔끔할 듯
+        """Config를 사용하여 모델을 학습합니다."""
         save_dir = os.path.join(MODEL_SAVE_DIR, self.model_name)
         os.makedirs(save_dir, exist_ok=True)
         trainer = create_trainer(self)

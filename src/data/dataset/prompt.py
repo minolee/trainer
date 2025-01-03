@@ -2,10 +2,7 @@
 from __future__ import annotations
 from pydantic import BaseModel, ConfigDict
 from src.base import BaseMessage, create_get_fn, Speaker
-from typing import Callable
-import sys
-# how?
-# 지금 굉장히 더러워 보이는데 나중에 깔끔하게 만들어 보자..
+
 
 __all__ = ["get_prompt", "PromptTemplate"]
 
