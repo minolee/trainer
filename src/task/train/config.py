@@ -10,11 +10,13 @@ from src.env import MODEL_SAVE_DIR
 from .loss import get_loss_fn
 from pydantic import Field
 
+import torch
 import transformers
 import trl
 import os
 
 get_trainer = create_get_fn(transformers, trl, type_hint=transformers.Trainer)
+get_optimizer = create_get_fn(torch.optim, type_hint=torch.optim.Optimizer)
 
 def create_trainer(config: TrainConfig):
     name = config.model_name
@@ -43,7 +45,7 @@ def create_trainer(config: TrainConfig):
     # 결과를 출력합니다.
     print(f"전체 파라미터 수: {total_params}")
     print(f"학습 가능한 파라미터 수: {trainable_params}")
-    loss_fn: torch.nn.Module = get_loss_fn(config.loss_config)() # type: ignore
+    loss_fn: torch.nn.Module = get_loss_fn(config.loss)() # type: ignore
     
     class _Trainer(base_trainer):
         def __init__(self):
@@ -64,6 +66,7 @@ def create_trainer(config: TrainConfig):
             logits = self.model(**inp_tensor).logits
             loss = loss_fn(logits.view(-1, logits.shape[-1]), label.view(-1))
             return loss
+
     return _Trainer()
 
 class TrainConfig(BaseConfig):
@@ -77,9 +80,9 @@ class TrainConfig(BaseConfig):
     tokenizer: TokenizerConfig
     model: ModelConfig
 
-    loss_config: CallConfig
-    optimizer_config: CallConfig
-    scheduler_config: CallConfig
+    loss: CallConfig
+    optimizer: CallConfig | None = None
+    scheduler: CallConfig | None = None
 
     training_arguments: BaseConfig = Field(default_factory=lambda: BaseConfig())
     """used for hf trainer config. check https://huggingface.co/docs/transformers/v4.47.1/en/main_classes/trainer#transformers.TrainingArguments"""

@@ -11,10 +11,32 @@ import sys
 __all__ = ["get_dataset", "BaseDataset"]
 
 
-get_dataset = create_get_fn(__name__, type_hint=D)
-
-
 class BaseDataset(D):
+    def __init__(
+        self, 
+        data: Iterable[DataElem], 
+        split: str,
+        prompt: PromptTemplate,
+        tokenizer: PreTrainedTokenizer,
+        max_length: int,
+        **kwargs
+    ):
+        self.raw_data = data
+        self.split = split
+        self.tokenizer = tokenizer
+        self.prompt = prompt
+        self.tokenized = []
+        self.max_length = max_length
+        self.train_every_assistant_message = kwargs.get("train_every_assistant_message", False)
+    
+    def setup(self):
+        # setup logic
+        raise NotImplementedError
+
+get_dataset = create_get_fn(__name__, type_hint=BaseDataset)
+
+
+class SFTDataset(BaseDataset):
     """
     read from KT style jsonl file, no passage used
     used for sft model

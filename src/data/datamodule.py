@@ -37,7 +37,7 @@ class DataModule:
         for stage in stages:
             self.prepared[stage] = []
             target_data = self.reader_config[stage]
-            dataset: BaseDataset = self.dataset_config(stage, target_data, self.tokenizer) # type: ignore
+            dataset: SFTDataset = self.dataset_config(stage, target_data, self.tokenizer) # type: ignore
             
             self.prepared[stage].append(dataset)
             
