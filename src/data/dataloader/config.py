@@ -25,6 +25,6 @@ class DataLoaderConfig(BaseConfig):
             collate_fn=partial(
                 get_collate_fn(self.collate_fn),
                 pad_id = 0,
-                padding_side = tokenizer.padding_side or self.padding_side
+                padding_side = self.padding_side or tokenizer.padding_side
             )
         )

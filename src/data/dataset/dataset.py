@@ -80,11 +80,15 @@ class BaseDataset(D):
                 input_ids.append(inference_header_tok["input_ids"].squeeze())
                 attention_mask.append(inference_header_tok["attention_mask"].squeeze())
                 input_ids = torch.cat(input_ids, dim=0)
+                position_ids = torch.arange(0, input_ids.shape[-1], dtype=torch.long)
                 attention_mask = torch.cat(attention_mask, dim=0)
-                if input_ids.shape[0] > self.max_length: continue
+                if input_ids.shape[0] > self.max_length: 
+                    # inference 과정에서는 skip하면 망한다
+                    self.tokenized.append({})
                 self.tokenized.append({
                     "input_ids": input_ids,
-                    "attention_mask": attention_mask
+                    "attention_mask": attention_mask,
+                    "position_ids": position_ids
                 })
             
     def __len__(self):

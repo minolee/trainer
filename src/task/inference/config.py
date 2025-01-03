@@ -37,7 +37,7 @@ class InferenceConfig(BaseConfig):
     # generation이 아니라면? 일단은 그냥 놔두고 나중에 task 분리 필요할 듯?
     generation_config: GenerationConfig = Field(default_factory=lambda: GenerationConfig())
     logit_processors: list[str | CallConfig] = Field(default_factory=list)
-    output_config: str | None = None
+    out_format: str | None = None
 
     # deepspeed_config: DeepSpeedConfig | None = None
     def __call__(self):
@@ -49,13 +49,13 @@ class InferenceConfig(BaseConfig):
                 model_config = c.model
                 tokenizer_config = c.tokenizer
             else:
-                model_config = ModelConfig(base_config=self.pretrained_model)
-                tokenizer_config = TokenizerConfig(from_pretrained=self.pretrained_model)
+                model_config = ModelConfig(path=self.pretrained_model)
+                tokenizer_config = TokenizerConfig(path=self.pretrained_model)
         else:
             assert self.model and self.tokenizer
             model_config = self.model
             tokenizer_config = self.tokenizer
-        
+        self.dataloader.padding_side = "left" # force left padding, since position_id is given manually
         datamodule = DataModule(
             self.reader,
             self.dataset,
@@ -74,10 +74,19 @@ class InferenceConfig(BaseConfig):
         for batch in datamodule["test"]:
             batch = {k: v.to(model.device) for k, v in batch.items()}
             
-            generated = model.generate(batch["input_ids"], generation_config, attention_mask=batch["attention_mask"])
-            for gen in generated:
+            generated = model.generate(
+                batch["input_ids"], 
+                generation_config, 
+                attention_mask=batch["attention_mask"],
+                position_ids=batch["position_ids"]
+            )
+
+            inp_size = batch["input_ids"].shape[-1]
+            
+            for gen in generated[:, inp_size:]:
                 result.append(tokenizer.decode(gen, skip_special_tokens=True))
-        print(result) 
+        
+        print(result)
 
 class GenerationConfig(BaseConfig):
     """Huggingface generation config를 따름. 정의되지 않은 값은 모델의 generation config를 가져온다.
