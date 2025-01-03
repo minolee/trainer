@@ -34,7 +34,7 @@ jobs:
       - name: Build documentation
         run: |
           cd docs
-          sphinx-apidog -f -o ./source ../src
+          sphinx-apidoc -f -o ./source ../src
           make html
           # 또는
           # sphinx-build -b html . _build/html
