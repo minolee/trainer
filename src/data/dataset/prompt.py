@@ -9,6 +9,8 @@ __all__ = ["get_prompt", "PromptTemplate"]
 
 class PromptTemplate(BaseModel):
     """Message를 LLM Prompt로 변환하는 데 사용하는 템플릿"""
+
+    # tokenizer의 apply_chat_template를 사용할 수 없다면 이걸 사용할 것
     # dictionary + prompt template -> prompt
     # template(dialogues) -> prompt 가 되면 됨
     model_config = ConfigDict(extra="allow")

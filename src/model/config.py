@@ -13,6 +13,8 @@ class ModelConfig(BaseConfig):
     """if false, will load model without weights"""
     device: str = "cuda" # device to use
 
+    load_kwargs: BaseConfig = BaseConfig()
+
     def __call__(self) -> PreTrainedModel:
         """load model from config"""
         if not self.load_weight:
@@ -20,7 +22,7 @@ class ModelConfig(BaseConfig):
                 AutoConfig.from_pretrained(self.path)
             ) # does not load weights
         else:
-            model = AutoModelForCausalLM.from_pretrained(self.path)
+            model = AutoModelForCausalLM.from_pretrained(self.path, **self.load_kwargs.model_dump())
         
         model.to(self.device) # type: ignore
         self.model_type = getattr(model.config, "model_type", "unknown")

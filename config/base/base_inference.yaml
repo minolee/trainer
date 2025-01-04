@@ -13,7 +13,7 @@ reader:
 dataset:
   prompt: Llama31
   dataset: 
-    name: BaseDataset
+    name: InferenceDataset
     max_length: 1024
 
 dataloader:
