@@ -1,0 +1,51 @@
+name: Build and Deploy Docs
+
+on:
+  push:
+    branches:
+      - main
+  # 필요하다면 pull_request 등 다른 트리거를 추가할 수도 있습니다.
+  # pull_request:
+  #   branches:
+  #     - main
+
+jobs:
+  build-and-deploy-docs:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1) 저장소 체크아웃
+      - name: Check out the repository
+        uses: actions/checkout@v2
+
+      # 2) Python 설정
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: "3.10"
+
+      # 3) 의존성 패키지 설치 (Sphinx, 테마 등)
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel sphinx
+          pip install torch pyyaml pydantic tokenizers transformers accelerate trl
+
+      # 4) 문서 빌드
+      - name: Build documentation
+        run: |
+          cd docs
+          sphinx-apidoc -f -o ./source ../src
+          make html
+          # 또는
+          # sphinx-build -b html . _build/html
+
+      # 5) GitHub Pages로 배포
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.MLOPS_WORKFLOW }}
+          publish_dir: docs/build/html
+          # 기본 값은 gh-pages
+          publish_branch: gh-pages
+          # gh-pages 브랜치가 없을 때(force_orphan: true) 새로 생성
+          force_orphan: true
