@@ -21,6 +21,9 @@ get_optimizer = create_get_fn(torch.optim, type_hint=torch.optim.Optimizer)
 
 def create_trainer(config: TrainConfig):
     """Config를 사용하여 Trainer를 생성합니다. Deepspeed config가 있을 경우 필요한 설정을 추가합니다."""
+    
+    kwargs = {} # PPO같은 일부 trainer들은 model, arg 순서로 받지 않아서 kwargs로 넘겨줌
+
     name = config.model_name
     per_device_train_batch_size = getattr(config.training_arguments, "per_device_train_batch_size", 8)
     config.dataloader.batch_size = per_device_train_batch_size
@@ -32,6 +35,14 @@ def create_trainer(config: TrainConfig):
     if config.scheduler:
         train_args.set_lr_scheduler(**config.scheduler.model_dump())
     model = config.model()
+    kwargs["model"] = model
+    kwargs["args"] = train_args
+    
+    if config.ref_model:
+        kwargs["ref_model"] = config.ref_model()
+    if config.reward_model:
+        kwargs["reward_model"] = config.reward_model()
+
     datamodule = DataModule(
         config.reader,
         config.dataset,
@@ -62,7 +73,7 @@ def create_trainer(config: TrainConfig):
     
     class _Trainer(base_trainer):
         def __init__(self):
-            super().__init__(model, train_args)
+            super().__init__(**kwargs)
         
         def get_train_dataloader(self):
             return datamodule["train"]
@@ -74,6 +85,7 @@ def create_trainer(config: TrainConfig):
             return datamodule["test"]
 
         def compute_loss(self, model, batch, *_, **__):
+            # 이거 바꿔야 함...
             inp_tensor = {k: v.to(model.device) for k, v in batch.items()}
             label = inp_tensor.pop("label")
             logits = self.model(**inp_tensor).logits
@@ -84,14 +96,23 @@ def create_trainer(config: TrainConfig):
 
 class TrainConfig(BaseConfig):
 
-    model_name: str # 모델이 저장될 이름, 이 path에 저장됨
+    model_name: str 
+    """모델이 저장될 이름, 학습 결과는 이 path에 저장됨"""
     base_trainer: str | CallConfig = "Trainer"
     
     reader: ReaderConfig
     dataset: DatasetConfig
     dataloader: DataLoaderConfig
     tokenizer: TokenizerConfig
+    
     model: ModelConfig
+    """학습을 진행할 메인 모델"""
+
+    ref_model: ModelConfig | None = None
+    """DPO 등의 preference learning 과정에서 사용할 reference model. 없을 경우 Trainer default 사용"""
+    reward_model: ModelConfig | None = None
+    """PPO 등의 learning 과정에서 reward를 계산할 때 사용할 모델"""
+
 
     loss: CallConfig
     optimizer: CallConfig | None = None

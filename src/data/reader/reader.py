@@ -33,9 +33,9 @@ def read_preference(source: str) -> Iterable[DataElem]:
         if "rejected" not in item: continue
         messages = [BaseMessage(**x) for x in item["dialogHistory"][:-1]]
         messages.append(PreferenceMessage(
-            speaker=item["dialogHistory"][-1].speaker,
-            message=item["chosen"],
-            rejected_message=item["rejected"]
+            speaker=item["dialogHistory"][-1]["speaker"],
+            message=item["chosen"]["message"],
+            rejected_message=item["rejected"]["message"]
         ))
         yield DataElem(
             data_source=source,
