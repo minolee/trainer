@@ -132,15 +132,20 @@ class PreferenceDataset(BaseDataset):
         input_ids.append(inference_header_tok["input_ids"].squeeze())
         attention_mask.append(inference_header_tok["attention_mask"].squeeze())
         input_ids = torch.cat(input_ids, dim=0)
-        position_ids = torch.arange(0, input_ids.shape[-1], dtype=torch.long)
         attention_mask = torch.cat(attention_mask, dim=0)
+        last_message: PreferenceMessage = elem.elem[-1]
+        chosen = self.tokenizer(last_message.message, return_tensors="pt")
+        rejected = self.tokenizer(last_message.rejected_message, return_tensors="pt")
         if input_ids.shape[0] > self.max_length: 
             # inference 과정에서는 skip하면 망한다
             return {}
         return {
-            "input_ids": input_ids,
-            "attention_mask": attention_mask,
-            "position_ids": position_ids
+            "prompt_input_ids": input_ids,
+            "prompt_attention_mask": attention_mask,
+            "chosen_input_ids": chosen["input_ids"].squeeze(),
+            "chosen_attention_mask": chosen["attention_mask"].squeeze(),
+            "rejected_input_ids": rejected["input_ids"].squeeze(),
+            "rejected_attention_mask": rejected["attention_mask"].squeeze(),
         }
 
 class PackingDataset(D):
