@@ -81,14 +81,18 @@ Dataset을 받아 DataLoader를 만드는 과정을 제어합니다. 이 과정�
 ## Evaluation 준비
 Ongoing
 
-## Document
-https://minolee.github.io/mlops/
 
 ## Develop
 
 Task나 필요에 따라 추가적인 class를 정의해야 할 수 있습니다. 이 경우 참고해 주세요.
 
+### Document
+https://minolee.github.io/mlops/
+
 ### Code Concept
+목적이 있는 모든 config는 callable입니다. config를 로드한 뒤 call하면 목적에 맞는 object를 반환하거나(예시: DatasetConfig), 프로세스를 실행합니다(예시: TrainConfig).
+
+따라서, config를 새로 만드는 경우는 완전히 새로운 process가 필요한 것이라고 생각하면 됩니다. 기존 process를 개선하거나 기능을 추가하고 싶은 경우에는 해당 process에 필요한 추가 기능을 구현한 뒤 config에 동작 제어를 추가해 주세요.
 
 
 ## TODO LIST
