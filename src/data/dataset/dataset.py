@@ -90,10 +90,10 @@ class SFTDataset(BaseDataset):
         d = {
             "input_ids": input_ids,
             "attention_mask": attention_mask,
-            "label": label
+            "labels": label
         }
         if input_ids.shape[0] > self.max_length:
-            return {}
+            return {"input_ids": torch.tensor([0]), "attention_mask": torch.tensor([0]), "labels": torch.tensor([0])}
         return d
 
 
@@ -112,7 +112,7 @@ class InferenceDataset(BaseDataset):
         attention_mask = torch.cat(attention_mask, dim=0)
         if input_ids.shape[0] > self.max_length: 
             # inference 과정에서는 skip하면 망한다
-            return {}
+            return {"input_ids": torch.tensor([0]), "attention_mask": torch.tensor([0]), "position_ids": torch.tensor([0])}
         return {
             "input_ids": input_ids,
             "attention_mask": attention_mask,
@@ -137,8 +137,7 @@ class PreferenceDataset(BaseDataset):
         chosen = self.tokenizer(last_message.message, return_tensors="pt")
         rejected = self.tokenizer(last_message.rejected_message, return_tensors="pt")
         if input_ids.shape[0] > self.max_length: 
-            # inference 과정에서는 skip하면 망한다
-            return {}
+            return {"prompt_input_ids": torch.tensor([0]), "prompt_attention_mask": torch.tensor([0]), "chosen_input_ids": torch.tensor([0]), "chosen_attention_mask": torch.tensor([0]), "rejected_input_ids": torch.tensor([0]), "rejected_attention_mask": torch.tensor([0])}
         return {
             "prompt_input_ids": input_ids,
             "prompt_attention_mask": attention_mask,

@@ -69,8 +69,8 @@ def create_trainer(config: TrainConfig):
         print(f"전체 파라미터 수: {total_params}")
         print(f"학습 가능한 파라미터 수: {trainable_params}")
 
-    loss_fn: torch.nn.Module = get_loss_fn(config.loss)() # type: ignore
-    
+    # loss_fn: torch.nn.Module = get_loss_fn(config.loss)() # type: ignore
+    # kwargs["compute_loss_func"] = lambda model, batch, *_, **__: loss_fn(model, batch)
     class _Trainer(base_trainer):
         def __init__(self):
             super().__init__(**kwargs)
@@ -84,13 +84,13 @@ def create_trainer(config: TrainConfig):
         def get_test_dataloader(self):
             return datamodule["test"]
 
-        def compute_loss(self, model, batch, *_, **__):
-            # 이거 바꿔야 함...
-            inp_tensor = {k: v.to(model.device) for k, v in batch.items()}
-            label = inp_tensor.pop("label")
-            logits = self.model(**inp_tensor).logits
-            loss = loss_fn(logits.view(-1, logits.shape[-1]), label.view(-1))
-            return loss
+        # def compute_loss(self, model, batch, *_, **__):
+        #     # 이거 바꿔야 함...
+        #     inp_tensor = {k: v.to(model.device) for k, v in batch.items()}
+        #     label = inp_tensor.pop("label")
+        #     logits = self.model(**inp_tensor).logits
+        #     loss = loss_fn(logits.view(-1, logits.shape[-1]), label.view(-1))
+        #     return loss
 
     return _Trainer()
 
