@@ -1,9 +1,9 @@
 from __future__ import annotations
 from src.base import BaseConfig, CallConfig, create_get_fn
 from src.data import DataModule
-from src.data.reader import ReaderConfig
+from src.data.reader import ReaderConfig, PromptTemplate, get_prompt
 from src.data.dataset import DatasetConfig
-from src.data.dataloader import DataLoaderConfig
+from src.data.dataloader import get_collate_fn, DataLoaderConfig
 from src.model import ModelConfig
 from src.tokenizer import TokenizerConfig
 from src.env import MODEL_SAVE_DIR
@@ -15,6 +15,7 @@ import torch
 import transformers
 import trl
 import os
+import inspect
 
 get_trainer = create_get_fn(transformers, trl, type_hint=transformers.Trainer)
 get_optimizer = create_get_fn(torch.optim, type_hint=torch.optim.Optimizer)
@@ -26,33 +27,71 @@ def create_trainer(config: TrainConfig):
 
     name = config.model_name
     per_device_train_batch_size = getattr(config.training_arguments, "per_device_train_batch_size", 8)
-    config.dataloader.batch_size = per_device_train_batch_size
+    # config.dataloader.batch_size = per_device_train_batch_size
     if hasattr(config.training_arguments, "deepspeed"):
         config.training_arguments.deepspeed["train_micro_batch_size_per_gpu"] = per_device_train_batch_size # type: ignore
-    train_args = transformers.TrainingArguments(f"{MODEL_SAVE_DIR}/{name}", **config.training_arguments.model_dump()) # deepspeed init here
+    
+    # set trainer and training argument class
+    
+    base_trainer: type[transformers.Trainer] = get_trainer(config.base_trainer)
+    argument_cls = inspect.signature(base_trainer.__init__).parameters["args"].annotation
+    if not inspect.isclass(argument_cls): # maybe union or optional type
+        argument_cls = argument_cls.__args__[0]
+    train_args: transformers.TrainingArguments = argument_cls(f"{MODEL_SAVE_DIR}/{name}", **config.training_arguments.model_dump()) # deepspeed init here
+    
+    
     if config.optimizer:
         train_args.set_optimizer(**config.optimizer.model_dump())
     if config.scheduler:
         train_args.set_lr_scheduler(**config.scheduler.model_dump())
+    # if config.loss:
+    #     kwargs["compute_loss_func"] = get_loss_fn(config.loss)()
+    # load model
     model = config.model()
+    tokenizer = config.tokenizer()
+    if not hasattr(tokenizer, "pad_token") or tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+        tokenizer.pad_token_id = tokenizer.eos_token_id
     kwargs["model"] = model
+    kwargs["processing_class"] = tokenizer
     kwargs["args"] = train_args
     
     if config.ref_model:
         kwargs["ref_model"] = config.ref_model()
     if config.reward_model:
         kwargs["reward_model"] = config.reward_model()
+    if config.dataloader.collate_fn:
+        kwargs["data_collator"] = get_collate_fn(config.dataloader.collate_fn)
+    # load data
 
+    
     datamodule = DataModule(
         config.reader,
         config.dataset,
-        config.dataloader,
         config.tokenizer
     )
-    base_trainer: type[transformers.Trainer] = get_trainer(config.base_trainer)
+
     datamodule.prepare_data(["train", "dev"])
     datamodule.setup(["train", "dev"]) # type: ignore
     datamodule.info()
+    kwargs["train_dataset"] = datamodule["train"]
+    kwargs["eval_dataset"] = datamodule["dev"]
+    # config.reader()
+    # prompt = get_prompt("Llama31")
+    # train_dataset = config.reader["train"]
+    # train_dataset.map(tokenizer.apply_chat_template)
+    # kwargs["train_dataset"] = train_dataset
+    # try:
+    #     dev_dataset = config.reader["dev"]
+    #     dev_dataset.map(tokenizer.apply_chat_template)
+    #     kwargs["eval_dataset"] = dev_dataset
+    # except KeyError:
+    #     print("No dev dataset")
+
+
+    
+    
+    
     
     # print model summary
     # 모델의 모든 파라미터를 가져옵니다.
@@ -71,28 +110,8 @@ def create_trainer(config: TrainConfig):
 
     # loss_fn: torch.nn.Module = get_loss_fn(config.loss)() # type: ignore
     # kwargs["compute_loss_func"] = lambda model, batch, *_, **__: loss_fn(model, batch)
-    class _Trainer(base_trainer):
-        def __init__(self):
-            super().__init__(**kwargs)
-        
-        def get_train_dataloader(self):
-            return datamodule["train"]
-        
-        def get_eval_dataloader(self):
-            return datamodule["dev"]
-        
-        def get_test_dataloader(self):
-            return datamodule["test"]
 
-        # def compute_loss(self, model, batch, *_, **__):
-        #     # 이거 바꿔야 함...
-        #     inp_tensor = {k: v.to(model.device) for k, v in batch.items()}
-        #     label = inp_tensor.pop("label")
-        #     logits = self.model(**inp_tensor).logits
-        #     loss = loss_fn(logits.view(-1, logits.shape[-1]), label.view(-1))
-        #     return loss
-
-    return _Trainer()
+    return base_trainer(**kwargs)
 
 class TrainConfig(BaseConfig):
 

@@ -13,7 +13,7 @@ def collate_fn_type_hint(
 get_collate_fn = create_get_fn(__name__, type_hint=collate_fn_type_hint)
 
 
-def base_collate_fn(batch: list[dict[str, torch.Tensor]], pad_id, padding_side="left"):
+def base_collate_fn(batch: list[dict[str, torch.Tensor]], pad_id=0, padding_side="right"):
     result = {k: [] for k in batch[0].keys()}
     if isinstance(pad_id, int):
         pad_id = {k: pad_id for k in result.keys()}

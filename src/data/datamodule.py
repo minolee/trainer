@@ -1,4 +1,4 @@
-"""데이터를 총괄하는 모듈"""
+"""데이터를 총괄하는 모듈 - 아마 안쓸듯?"""
 from .reader import ReaderConfig, BaseDataset
 from .dataset import DatasetConfig
 from .dataloader import DataLoaderConfig
@@ -16,15 +16,13 @@ class DataModule:
         self, 
         reader_config: ReaderConfig,
         dataset_config: DatasetConfig,
-        dataloader_config: DataLoaderConfig,
         tokenizer_config: TokenizerConfig
     ):
         super().__init__()
         self.reader_config = reader_config
         self.dataset_config = dataset_config
-        self.dataloader_config = dataloader_config
         self.prepared: dict[str, list[BaseDataset]] = {} # before setup
-        self.processed: dict[str, Dataset] = {}
+        # self.processed: dict[str, Dataset] = {}
         
         self.tokenizer: PreTrainedTokenizer = tokenizer_config() # type: ignore
     
@@ -61,5 +59,5 @@ class DataModule:
                     print(f"Number of data: {len(dataset)}")
 
     def __getitem__(self, key: str):
-        return self.dataloader_config(ConcatDataset(self.prepared[key]), self.tokenizer)
+        return ConcatDataset(self.prepared[key])
     

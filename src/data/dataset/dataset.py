@@ -1,4 +1,5 @@
 # BaseMessage + prompt to torch dataset
+# 안쓸듯
 from __future__ import annotations
 import torch
 from torch.utils.data import Dataset as D
@@ -32,7 +33,7 @@ class BaseDataset(D):
         """
         raw data를 가공하여 dataset으로 가공
         """
-        self.tokenized = [self.process_elem(x) for x in self.raw_data]
+        self.tokenized = [data for x in self.raw_data if (data:=self.process_elem(x)) is not None]
 
 
     def __len__(self):
@@ -41,7 +42,7 @@ class BaseDataset(D):
     def __getitem__(self, idx):
         return self.tokenized[idx]
 
-    def process_elem(self, elem: DataElem) -> dict[str, torch.Tensor]:
+    def process_elem(self, elem: DataElem) -> dict[str, torch.Tensor] | None:
         """
         DataElem을 받아서 모델의 입력으로 가공하는 함수. subclass에서 이 함수를 구현하면 됨.
 
@@ -68,7 +69,7 @@ class SFTDataset(BaseDataset):
     read from KT style jsonl file, no passage used
     used for sft model
     """
-    def process_elem(self, elem: DataElem) -> dict[str, torch.Tensor]:
+    def process_elem(self, elem: DataElem) -> dict[str, torch.Tensor] | None:
         messages = elem.elem
         messages = self.merge_system_prompt(messages)
         # 학습 split별로 다른 처리 진행
@@ -93,7 +94,7 @@ class SFTDataset(BaseDataset):
             "labels": label
         }
         if input_ids.shape[0] > self.max_length:
-            return {"input_ids": torch.tensor([0]), "attention_mask": torch.tensor([0]), "labels": torch.tensor([0])}
+            return None
         return d
 
 
@@ -137,7 +138,7 @@ class PreferenceDataset(BaseDataset):
         chosen = self.tokenizer(last_message.message, return_tensors="pt")
         rejected = self.tokenizer(last_message.rejected_message, return_tensors="pt")
         if input_ids.shape[0] > self.max_length: 
-            return {"prompt_input_ids": torch.tensor([0]), "prompt_attention_mask": torch.tensor([0]), "chosen_input_ids": torch.tensor([0]), "chosen_attention_mask": torch.tensor([0]), "rejected_input_ids": torch.tensor([0]), "rejected_attention_mask": torch.tensor([0])}
+            return None
         return {
             "prompt_input_ids": input_ids,
             "prompt_attention_mask": attention_mask,

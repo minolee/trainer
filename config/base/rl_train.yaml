@@ -1,5 +1,6 @@
 
 model_name: test_gpt2_dpo
+base_trainer: DPOTrainer
 reader:
   sources:
     - name: test

@@ -6,8 +6,9 @@ reader:
     - name: test
       source: rsc/data/AiHub-Largeai_SFT_QA.jsonl
       split:
-        type: train
-      limit: 50
+        type: mixed
+        split_ratio: "9:1"
+      limit: 500
       reader: read_simple
 
 
@@ -21,6 +22,7 @@ dataset:
 dataloader:
   shuffle: true
   num_workers: 0 # num_workers > 0이면 메모리 더 나감
+  collate_fn: base_collate_fn
 
 
 tokenizer:
@@ -28,7 +30,7 @@ tokenizer:
 
 model:
   path: openai-community/gpt2
-  device: cpu
+  device: mps
 
 
 loss:
@@ -48,3 +50,4 @@ training_arguments:
   num_train_epochs: 1
   gradient_accumulation_steps: 4
   per_device_train_batch_size: 8
+  logging_steps: 5
