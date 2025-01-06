@@ -4,19 +4,17 @@ import trl
 import torch
 import warnings
 from collections import defaultdict
-from src.base import create_get_fn
 from peft import PeftModel, get_peft_model, prepare_model_for_kbit_training
 from transformers.models.auto.modeling_auto import MODEL_FOR_VISION_2_SEQ_MAPPING_NAMES
 from transformers.utils import is_peft_available
 import inspect
 from typing import Any
-__all__ = ["get_trainer"]
-
-get_trainer = create_get_fn(__name__, transformers, trl, type_hint=transformers.Trainer)
 
 class DPOTrainer(trl.DPOTrainer):
     r"""
     Initialize DPOTrainer.
+
+    기존 trl.DPOTrainer에서 dataset 관련된 처리 제거
 
     Args:
         model (`transformers.PreTrainedModel`):

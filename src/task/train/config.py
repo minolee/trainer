@@ -149,8 +149,8 @@ class TrainConfig(BaseConfig):
         trainer = create_trainer(self)
 
         trainer.train()
-        self.model.path = save_dir
-        self.dump(os.path.join(save_dir, "config.yaml"))
-        
-        trainer.save_model(save_dir)
+        if is_rank_zero():
+            self.model.path = save_dir
+            self.dump(os.path.join(save_dir, "config.yaml"))
+            trainer.save_model(save_dir)
         
