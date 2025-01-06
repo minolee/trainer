@@ -1,20 +1,19 @@
-pretrained_model: test_gpt2
+pretrained_model: test_gpt2_dpo
 
 reader:
   sources:
     - name: test
       source: rsc/data/single_lines.jsonl
       split:
-        type: predict
+        type: test
       reader: read_simple
-      limit: 20
   
 
 dataset:
   prompt: Llama31
   dataset: 
     name: InferenceDataset
-    max_length: 1024
+    max_length: 924
 
 dataloader:
   shuffle: false
