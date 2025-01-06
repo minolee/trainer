@@ -1,5 +1,4 @@
-# BaseMessage + prompt to torch dataset
-# 안쓸듯
+"""BaseMessage + prompt to torch dataset"""
 from __future__ import annotations
 import torch
 from torch.utils.data import Dataset as D

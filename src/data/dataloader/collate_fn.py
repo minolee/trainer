@@ -32,6 +32,10 @@ def base_collate_fn(batch: list[dict[str, torch.Tensor]], pad_id=0, padding_side
     return {k: torch.stack(v) for k, v in result.items()}
 
 def preference_collate_fn(batch: list[dict[str, torch.Tensor]], pad_id=0, padding_side="right"):
+    """collator for dpo trainer
+    
+    dpo trainer가 중간에 dataset에서 attention_mask를 날려버려서 여기서 수동으로 추가해 줌
+    """
     result = {k: [] for k in batch[0].keys()}
     keys = [k for k, v in batch[0].items() if v.dim() > 0]
     max_len = max(x[key].shape[-1] for x in batch for key in keys)
