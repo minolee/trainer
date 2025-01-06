@@ -48,7 +48,8 @@ class ReaderConfig(BaseConfig):
                 # result.extend([x.to_dict() for x in source[key]])
                 result.extend(source[key])
         if len(result) == 0:
-            raise KeyError(f"{key} is not in the data")
+            return []
+            # raise KeyError(f"{key} is not in the data")
         # return Dataset.from_list(result, features=get_features(self.sources[0].feature)())
         return result
     
@@ -82,7 +83,7 @@ class ReaderElem(BaseConfig):
     reader: str | CallConfig | None = None
     """Raw data를 Message 형태로 변환하는 함수"""
 
-    feature: str | None = None
+    # feature: str | None = None
 
     # __load_buf: list[DataElem] = Field(default_factory=list, exclude=True)
     split_buf: dict[str, list[DataElem]] = Field(default_factory=dict, exclude=True)
@@ -101,9 +102,9 @@ class ReaderElem(BaseConfig):
             ws = world_size()
             load_buf = load_buf[:self.limit // ws]
         self.split_buf = {k: v for k, v in zip(["train", "dev", "test"], self.split(load_buf))}
-        self.feature = self.feature or (
-            "preference" if isinstance(load_buf[0].elem[-1], PreferenceMessage) else "prompt_completion"
-        ) # 이부분 더러워서 수정 필요 -> 일단 안써도 될듯?
+        # self.feature = self.feature or (
+        #     "preference" if isinstance(load_buf[0].elem[-1], PreferenceMessage) else "prompt_completion"
+        # ) # 이부분 더러워서 수정 필요 -> 일단 안써도 될듯?
     
     def __len__(self):
         return sum(len(x) for x in self.split_buf.values())

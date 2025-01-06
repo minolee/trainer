@@ -9,6 +9,7 @@ from src.tokenizer import TokenizerConfig
 from src.env import MODEL_SAVE_DIR
 from src.utils import world_size, is_rank_zero
 from .loss import get_loss_fn
+from .trainer import get_trainer
 from pydantic import Field
 
 import torch
@@ -17,7 +18,7 @@ import trl
 import os
 import inspect
 
-get_trainer = create_get_fn(transformers, trl, type_hint=transformers.Trainer)
+
 get_optimizer = create_get_fn(torch.optim, type_hint=torch.optim.Optimizer)
 
 def create_trainer(config: TrainConfig):
