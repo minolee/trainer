@@ -1,5 +1,5 @@
 
-model_name: test_gpt2
+model_name: test_gemma2_dpo
 reader:
   sources:
     - name: test
@@ -7,12 +7,6 @@ reader:
       split:
         type: train
       reader: read_simple
-    # - name: test2
-    #   source: rsc/data/single_lines.jsonl
-    #   split:
-    #     type: train
-    #   limit: 100
-    #   reader: read_simple
 
 dataset:
   prompt: Gemma2
@@ -48,7 +42,7 @@ scheduler:
 
 training_arguments:
   num_train_epochs: 1
-  per_device_train_batch_size: 8
+  per_device_train_batch_size: 4
   gradient_accumulation_steps: 4
   # report_to: tensorboard
   deepspeed:
