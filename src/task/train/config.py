@@ -1,4 +1,6 @@
 from __future__ import annotations
+
+import accelerate
 from src.base import BaseConfig, CallConfig, create_get_fn
 from src.data import DataModule
 from src.data.reader import ReaderConfig, PromptTemplate, get_prompt
@@ -7,9 +9,10 @@ from src.data.dataloader import get_collate_fn, DataLoaderConfig
 from src.model import ModelConfig
 from src.tokenizer import TokenizerConfig
 from src.env import MODEL_SAVE_DIR
-from src.utils import world_size, is_rank_zero
-from .loss import get_loss_fn
+from src.utils import world_size, is_rank_zero, rank
+
 from .trainer import get_trainer
+
 from pydantic import Field
 
 import torch
@@ -31,7 +34,7 @@ def create_trainer(config: TrainConfig):
     # config.dataloader.batch_size = per_device_train_batch_size
     if hasattr(config.training_arguments, "deepspeed"):
         config.training_arguments.deepspeed["train_micro_batch_size_per_gpu"] = per_device_train_batch_size # type: ignore
-    
+        # config.training_arguments.load_best_model_at_end = True
     # set trainer and training argument class
     
     base_trainer: type[transformers.Trainer] = get_trainer(config.base_trainer)
@@ -147,10 +150,20 @@ class TrainConfig(BaseConfig):
         save_dir = os.path.join(MODEL_SAVE_DIR, self.model_name)
         os.makedirs(save_dir, exist_ok=True)
         trainer = create_trainer(self)
-
+        if is_rank_zero():
+            print("start training...")
+            print(self.training_arguments)
+            print(self.model)
         trainer.train()
+        print(f"{rank()}/{world_size()}: training finished")
         if is_rank_zero():
             self.model.path = save_dir
             self.dump(os.path.join(save_dir, "config.yaml"))
-            trainer.save_model(save_dir)
         
+        if not getattr(self.training_arguments, "deepspeed", {}):
+            # deepspeed 환경에서 이거 부르면 영원히 끝나지 않는다. 대신 convert_checkpoint를 부를 것
+            trainer.save_model(save_dir)
+        else:
+            if is_rank_zero():
+                from src.utils import convert_checkpoint
+                convert_checkpoint(save_dir)
