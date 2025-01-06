@@ -1,0 +1,67 @@
+
+model_name: test_gemma2_sft
+reader:
+  sources:
+    - name: test
+      source: rsc/data/AiHub-Largeai_SFT_QA.jsonl
+      split:
+        type: train
+      reader: read_simple
+    # - name: test2
+    #   source: rsc/data/single_lines.jsonl
+    #   split:
+    #     type: train
+    #   limit: 100
+    #   reader: read_simple
+
+dataset:
+  prompt: Gemma2
+  dataset: 
+    name: SFTDataset
+    max_length: 4096
+
+dataloader:
+  shuffle: true
+  num_workers: 0 # num_workers > 0이면 메모리 더 나감
+  batch_size: 1
+
+tokenizer:
+  path: google/gemma-2-2b-it
+
+model:
+  path: google/gemma-2-2b-it
+  device: cuda
+
+
+loss:
+  name: CrossEntropyLoss
+  ignore_index: -100
+
+optimizer:
+  name: adamw_hf
+  learning_rate: 5.0e-5
+  weight_decay: 0.01
+
+scheduler:
+  name: linear
+  warmup_steps: 100
+
+training_arguments:
+  num_train_epochs: 1
+  per_device_train_batch_size: 4
+  gradient_accumulation_steps: 4
+  # report_to: tensorboard
+  deepspeed:
+    num_gpus: 8
+    zero_optimization:
+      stage: 3
+      offload_param:
+        device: cpu
+        pin_memory: true
+      offload_optimizer:
+        device: cpu
+        pin_memory: true
+    # 여기서 batch_size를 정의하지 말고 training_arguments에서 정의할 것
+    gradient_clipping: 1.0
+    fp16: 
+      enabled: auto

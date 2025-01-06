@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from src.base import BaseConfig, CallConfig, DataElem
+from src.base.base_message import PreferenceMessage
 from src.utils import world_size, rank_zero_only
 from .reader import get_reader
 from enum import Enum
@@ -44,7 +45,12 @@ class ReaderConfig(BaseConfig):
         result = []
         for source in self.sources:
             if key in source:
+                # result.extend([x.to_dict() for x in source[key]])
                 result.extend(source[key])
+        if len(result) == 0:
+            return []
+            # raise KeyError(f"{key} is not in the data")
+        # return Dataset.from_list(result, features=get_features(self.sources[0].feature)())
         return result
     
     @rank_zero_only
@@ -55,7 +61,10 @@ class ReaderConfig(BaseConfig):
         
         print("Number of sources:", len(self.sources))
         for k in DataType.__members__.keys():
-            print(f"{k} split: {len(self[k.lower()])}")
+            try:
+                print(f"{k} split: {len(self[k.lower()])}")
+            except:
+                pass
         
         print(f"Number of data: {len(self)}")
 
@@ -74,6 +83,8 @@ class ReaderElem(BaseConfig):
     reader: str | CallConfig | None = None
     """Raw data를 Message 형태로 변환하는 함수"""
 
+    # feature: str | None = None
+
     # __load_buf: list[DataElem] = Field(default_factory=list, exclude=True)
     split_buf: dict[str, list[DataElem]] = Field(default_factory=dict, exclude=True)
     """loaded data"""
@@ -91,7 +102,9 @@ class ReaderElem(BaseConfig):
             ws = world_size()
             load_buf = load_buf[:self.limit // ws]
         self.split_buf = {k: v for k, v in zip(["train", "dev", "test"], self.split(load_buf))}
-    
+        # self.feature = self.feature or (
+        #     "preference" if isinstance(load_buf[0].elem[-1], PreferenceMessage) else "prompt_completion"
+        # ) # 이부분 더러워서 수정 필요 -> 일단 안써도 될듯?
     
     def __len__(self):
         return sum(len(x) for x in self.split_buf.values())

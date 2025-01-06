@@ -26,13 +26,6 @@ def create_register_deco(registry: dict):
         def inner_fn(*args, **kwargs):
             return fn(*args, **kwargs)
         return inner_fn
-        # if inspect.isclass(fn):
-        #     inner_fn.__name__ = fn.__name__
-        #     inner_fn.__doc__ = fn.__doc__
-        #     inner_fn.__module__ = fn.__module__
-        #     return inner_fn
-        # else:
-        #     return wraps(fn)(inner_fn)
     return deco
 
 
