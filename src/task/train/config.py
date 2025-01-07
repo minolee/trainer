@@ -80,21 +80,6 @@ def create_trainer(config: TrainConfig):
     datamodule.info()
     kwargs["train_dataset"] = datamodule["train"]
     kwargs["eval_dataset"] = datamodule["dev"]
-    # config.reader()
-    # prompt = get_prompt("Llama31")
-    # train_dataset = config.reader["train"]
-    # train_dataset.map(tokenizer.apply_chat_template)
-    # kwargs["train_dataset"] = train_dataset
-    # try:
-    #     dev_dataset = config.reader["dev"]
-    #     dev_dataset.map(tokenizer.apply_chat_template)
-    #     kwargs["eval_dataset"] = dev_dataset
-    # except KeyError:
-    #     print("No dev dataset")
-
-
-    
-    
     
     
     # print model summary
@@ -137,7 +122,7 @@ class TrainConfig(BaseConfig):
     """PPO 등의 learning 과정에서 reward를 계산할 때 사용할 모델"""
 
 
-    loss: CallConfig
+    loss: CallConfig | None = None
     optimizer: CallConfig | None = None
     scheduler: CallConfig | None = None
 
@@ -154,6 +139,7 @@ class TrainConfig(BaseConfig):
             print("start training...")
             print(self.training_arguments)
             print(self.model)
+            self.tokenizer().save_pretrained(save_dir)
         trainer.train()
         print(f"{rank()}/{world_size()}: training finished")
         if is_rank_zero():
