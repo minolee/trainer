@@ -54,11 +54,17 @@ Base model, Task, 또는 학습 방법별로 다른 class를 사용합니다.
   * max_length: tokenize 결과 max_length 이상의 data는 제거됩니다.
 
 #### [DataLoader](https://github.com/minolee/mlops/blob/main/src/data/dataloader/config.py)
+<strike>
 Dataset을 받아 DataLoader를 만드는 과정을 제어합니다. 이 과정에서 batch_size, collate_fn, sampler 등을 정의할 수 있습니다.
 
 * shuffle: 데이터셋 섞기 여부
 * num_workers: dataloader worker
 * batch_size: batch size
+
+
+</strike>
+
+250106 변경: Dataloader는 hf trainer의 argument로 넘기는 방식으로 변경하였음
 
 
 ### 모델 준비

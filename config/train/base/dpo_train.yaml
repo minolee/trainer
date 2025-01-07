@@ -20,7 +20,7 @@ dataset:
 
 dataloader:
   shuffle: true
-  num_workers: 0 # num_workers > 0이면 메모리 더 나감
+  num_workers: 0
   collate_fn: preference_collate_fn
 
 tokenizer:

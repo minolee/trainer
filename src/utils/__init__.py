@@ -2,3 +2,7 @@
 
 from .rank import *
 from .file_util import *
+try:
+    from .deepspeed_util import *
+except ImportError:
+    pass

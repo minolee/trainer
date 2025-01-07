@@ -1,5 +1,4 @@
-# BaseMessage + prompt to torch dataset
-# 안쓸듯
+"""BaseMessage + prompt to torch dataset"""
 from __future__ import annotations
 import torch
 from torch.utils.data import Dataset as D
@@ -89,9 +88,9 @@ class SFTDataset(BaseDataset):
         label = torch.cat([input_ids[1:], torch.tensor([self.tokenizer.eos_token_id])], dim=0) # finish with eos token
         label = torch.where(loss_mask, label, -100)
         d = {
-            "input_ids": input_ids,
-            "attention_mask": attention_mask,
-            "labels": label
+            "input_ids": input_ids.view(-1),
+            "attention_mask": attention_mask.view(-1),
+            "labels": label.view(-1)
         }
         if input_ids.shape[0] > self.max_length:
             return None
@@ -108,6 +107,8 @@ class InferenceDataset(BaseDataset):
             tok = self.tokenizer(self.prompt.wrap(message), return_tensors="pt")
             input_ids.append(tok["input_ids"].squeeze()) # type: ignore
             attention_mask.append(tok["attention_mask"].squeeze()) # type: ignore
+        input_ids.append(self.tokenizer(self.prompt.inference_header(messages[-1].speaker), return_tensors="pt")["input_ids"].squeeze())
+        attention_mask.append(torch.ones_like(input_ids[-1]))
         input_ids = torch.cat(input_ids, dim=0)
         position_ids = torch.arange(0, input_ids.shape[-1], dtype=torch.long)
         attention_mask = torch.cat(attention_mask, dim=0)
@@ -115,9 +116,9 @@ class InferenceDataset(BaseDataset):
             # inference 과정에서는 skip하면 망한다
             return {"input_ids": torch.tensor([0]), "attention_mask": torch.tensor([0]), "position_ids": torch.tensor([0])}
         return {
-            "input_ids": input_ids,
-            "attention_mask": attention_mask,
-            "position_ids": position_ids
+            "input_ids": input_ids.view(-1),
+            "attention_mask": attention_mask.view(-1),
+            "position_ids": position_ids.view(-1)
         }
 
 class PreferenceDataset(BaseDataset):
@@ -140,12 +141,12 @@ class PreferenceDataset(BaseDataset):
         if input_ids.shape[0] > self.max_length: 
             return None
         return {
-            "prompt_input_ids": input_ids,
-            "prompt_attention_mask": attention_mask,
-            "chosen_input_ids": chosen["input_ids"].squeeze(),
-            "chosen_attention_mask": chosen["attention_mask"].squeeze(),
-            "rejected_input_ids": rejected["input_ids"].squeeze(),
-            "rejected_attention_mask": rejected["attention_mask"].squeeze(),
+            "prompt_input_ids": input_ids.view(-1),
+            "prompt_attention_mask": attention_mask.view(-1),
+            "chosen_input_ids": chosen["input_ids"].view(-1),
+            "chosen_attention_mask": chosen["attention_mask"].view(-1),
+            "rejected_input_ids": rejected["input_ids"].view(-1),
+            "rejected_attention_mask": rejected["attention_mask"].view(-1),
         }
 
 class PackingDataset(D):
