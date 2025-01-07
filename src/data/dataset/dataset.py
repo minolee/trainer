@@ -107,6 +107,8 @@ class InferenceDataset(BaseDataset):
             tok = self.tokenizer(self.prompt.wrap(message), return_tensors="pt")
             input_ids.append(tok["input_ids"].squeeze()) # type: ignore
             attention_mask.append(tok["attention_mask"].squeeze()) # type: ignore
+        input_ids.append(self.tokenizer(self.prompt.inference_header(messages[-1].speaker), return_tensors="pt")["input_ids"].squeeze())
+        attention_mask.append(torch.ones_like(input_ids[-1]))
         input_ids = torch.cat(input_ids, dim=0)
         position_ids = torch.arange(0, input_ids.shape[-1], dtype=torch.long)
         attention_mask = torch.cat(attention_mask, dim=0)

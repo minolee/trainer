@@ -22,8 +22,8 @@ def base_collate_fn(batch: list[dict[str, torch.Tensor]], pad_id=0, padding_side
     keys = [k for k, v in batch[0].items() if v.dim() > 0]
     max_len = max(x[key].shape[-1] for x in batch for key in keys)
     for item in batch:
-        if any(v.sum() == 0 for v in item.values()):
-            continue
+        # if any(v.sum() == 0 for v in item.values()):
+        #     continue
         for k, v in item.items():
             pad_tensor = torch.tensor([pad_id[k]] * (max_len - v.shape[-1])).to(v.dtype)
             x = [v]
