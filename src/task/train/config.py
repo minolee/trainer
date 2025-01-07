@@ -61,7 +61,10 @@ def create_trainer(config: TrainConfig):
     kwargs["args"] = train_args
     
     if config.ref_model:
-        kwargs["ref_model"] = config.ref_model()
+        ref_model = config.ref_model()
+        ref_model.eval()
+        kwargs["ref_model"] = ref_model
+
     if config.reward_model:
         kwargs["reward_model"] = config.reward_model()
     if config.dataloader.collate_fn:

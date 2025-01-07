@@ -19,11 +19,16 @@ dataset:
 dataloader:
   shuffle: true
   num_workers: 0
+  collate_fn: preference_collate_fn
 
 tokenizer:
   path: /home/work/user/alignment/model/v2.0/Midm_v2.0_Inst/merged_checkpoint
 
 model:
+  path: /home/work/user/alignment/model/v2.0/Midm_v2.0_Inst/merged_checkpoint
+  device: cuda
+
+ref_model:
   path: /home/work/user/alignment/model/v2.0/Midm_v2.0_Inst/merged_checkpoint
   device: cuda
 
@@ -57,4 +62,4 @@ training_arguments:
     # 여기서 batch_size를 정의하지 말고 training_arguments에서 정의할 것
     gradient_clipping: 1.0
     fp16: 
-      enabled: true
+      enabled: auto
