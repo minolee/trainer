@@ -1,5 +1,5 @@
 
-model_name: test_gemma2_sft
+model_name: test_llama31_sft
 reader:
   sources:
     - name: test
@@ -17,7 +17,7 @@ reader:
     #   reader: read_simple
 
 dataset:
-  prompt: Gemma2
+  prompt: Llama31
   dataset: 
     name: SFTDataset
     max_length: 4096
@@ -27,10 +27,10 @@ dataloader:
   num_workers: 0
 
 tokenizer:
-  path: google/gemma-2-2b-it
+  path: /home/work/user/alignment/model/v2.0/Midm_v2.0_Inst/merged_checkpoint
 
 model:
-  path: google/gemma-2-2b-it
+  path: /home/work/user/alignment/model/v2.0/Midm_v2.0_Inst/merged_checkpoint
   device: cuda
 
 
@@ -53,7 +53,7 @@ training_arguments:
   gradient_accumulation_steps: 4
   log_level: info
   save_only_model: true
-  gradient_checkpointing: false # set true to save more memory
+  gradient_checkpointing: true # set true to save more memory
   # report_to: tensorboard
   deepspeed:
     num_gpus: 8
@@ -68,4 +68,4 @@ training_arguments:
     # 여기서 batch_size를 정의하지 말고 training_arguments에서 정의할 것
     gradient_clipping: 1.0
     fp16: 
-      enabled: auto
+      enabled: true
