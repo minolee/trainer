@@ -1,5 +1,8 @@
+from src.env import Accelerator # initialize first
+
 import argparse
 from src.task import TrainConfig, InferenceConfig, EvaluationConfig
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode", type=str, choices=["train", "inference", "evaluation"])

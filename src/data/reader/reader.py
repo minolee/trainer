@@ -8,13 +8,13 @@ from src.utils import read_magic, rank_iter
 
 __all__ = ["get_reader"]
 
-@rank_iter
+# 250121: removed rank_iter - accelerate에서 알아서 split해서 넣어줌
+
 def reader_type(source: str) -> Iterable[DataElem]:
     ...
 
 get_reader = create_get_fn(__name__, type_hint=reader_type) # 이게되네
 
-@rank_iter
 def read_simple(source: str) -> Iterable[DataElem]:
     """jsonl file with dialogHistory key"""
     for i, item in enumerate(read_magic(source)):
@@ -25,7 +25,6 @@ def read_simple(source: str) -> Iterable[DataElem]:
             elem=[BaseMessage(**x) for x in item["dialogHistory"]]
         )
 
-@rank_iter
 def read_preference(source: str) -> Iterable[DataElem]:
     for i, item in enumerate(read_magic(source)):
         if "dialogHistory" not in item: continue
