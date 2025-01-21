@@ -2,6 +2,7 @@ torch
 
 pyyaml
 pydantic
+tyro
 
 datasets
 tokenizers
