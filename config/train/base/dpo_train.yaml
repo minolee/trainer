@@ -7,7 +7,7 @@ reader:
       source: rsc/data/preference/processed/dpo_1cycle_241016.jsonl
       split:
         type: train
-      limit: 50
+      limit: 500
       reader: read_preference
 
 
@@ -30,10 +30,6 @@ model:
   path: openai-community/gpt2
   device: cpu
 
-
-loss:
-  name: CrossEntropyLoss
-  ignore_index: -100
 
 optimizer:
   name: adamw_hf

@@ -1,5 +1,5 @@
 from __future__ import annotations
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 __all__ = ["BaseConfig", "CallConfig"]
 
 
@@ -13,7 +13,11 @@ class BaseConfig(BaseModel):
     """
     model_config = ConfigDict(extra="allow", use_enum_values=True)
     
+    no_save: bool | None = Field(None, exclude=True)
+    """multi-node training 중 중복 저장을 막기 위해 사용"""
+
     def dump(self, path):
+        if self.no_save: return
         from src.utils import write_magic
         write_magic(path, self.model_dump(exclude_none=True))
     

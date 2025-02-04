@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from src.base import BaseConfig, CallConfig
-
+from ..config import TaskConfig
 from src.data.reader import ReaderConfig
 from src.data.dataset import DatasetConfig
 from src.data.dataloader import DataLoaderConfig
@@ -17,7 +17,7 @@ from pydantic import Field
 from datetime import datetime
 __all__ = ["InferenceConfig"]
 
-class InferenceConfig(BaseConfig):
+class InferenceConfig(TaskConfig):
 
     pretrained_model: str | None = None
     """학습한 모델의 경로 또는 huggingface의 pretrained model card"""

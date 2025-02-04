@@ -9,10 +9,10 @@ from src.data.dataloader import get_collate_fn, DataLoaderConfig
 from src.model import ModelConfig
 from src.tokenizer import TokenizerConfig
 from src.env import MODEL_SAVE_DIR
-from src.utils import world_size, is_rank_zero, rank
+from src.utils import world_size, is_rank_zero, rank, drop_unused_args
 
 from .trainer import get_trainer
-
+from ..config import TaskConfig
 from pydantic import Field
 
 import torch
@@ -41,7 +41,10 @@ def create_trainer(config: TrainConfig):
     argument_cls = inspect.signature(base_trainer.__init__).parameters["args"].annotation
     if not inspect.isclass(argument_cls): # maybe union or optional type
         argument_cls = argument_cls.__args__[0]
-    train_args: transformers.TrainingArguments = argument_cls(f"{MODEL_SAVE_DIR}/{name}", **config.training_arguments.model_dump()) # deepspeed init here
+    train_args: transformers.TrainingArguments = argument_cls(
+        f"{MODEL_SAVE_DIR}/{name}", 
+        **drop_unused_args(argument_cls.__init__, config.training_arguments.model_dump())
+    ) # deepspeed init here
     
     
     if config.optimizer:
@@ -87,25 +90,25 @@ def create_trainer(config: TrainConfig):
     
     # print model summary
     # 모델의 모든 파라미터를 가져옵니다.
-    if world_size() == 1:
-        params = list(model.parameters())
+    # if world_size() == 1:
+    #     params = list(model.parameters())
 
-        # 전체 파라미터 수를 계산합니다.
-        total_params = sum(p.numel() for p in params)
+    #     # 전체 파라미터 수를 계산합니다.
+    #     total_params = sum(p.numel() for p in params)
 
-        # 학습 가능한(gradient를 계산하는) 파라미터 수를 계산합니다.
-        trainable_params = sum(p.numel() for p in params if p.requires_grad)
+    #     # 학습 가능한(gradient를 계산하는) 파라미터 수를 계산합니다.
+    #     trainable_params = sum(p.numel() for p in params if p.requires_grad)
 
-        # 결과를 출력합니다.
-        print(f"전체 파라미터 수: {total_params}")
-        print(f"학습 가능한 파라미터 수: {trainable_params}")
+    #     # 결과를 출력합니다.
+    #     print(f"전체 파라미터 수: {total_params}")
+    #     print(f"학습 가능한 파라미터 수: {trainable_params}")
 
     # loss_fn: torch.nn.Module = get_loss_fn(config.loss)() # type: ignore
     # kwargs["compute_loss_func"] = lambda model, batch, *_, **__: loss_fn(model, batch)
 
     return base_trainer(**kwargs)
 
-class TrainConfig(BaseConfig):
+class TrainConfig(TaskConfig):
 
     model_name: str 
     """모델이 저장될 이름, 학습 결과는 이 path에 저장됨"""
@@ -135,7 +138,7 @@ class TrainConfig(BaseConfig):
 
     def __call__(self):
         """Config를 사용하여 모델을 학습합니다."""
-        save_dir = os.path.join(MODEL_SAVE_DIR, self.model_name)
+        save_dir = self.save_dir
         os.makedirs(save_dir, exist_ok=True)
         trainer = create_trainer(self)
         if is_rank_zero():
@@ -156,3 +159,7 @@ class TrainConfig(BaseConfig):
             if is_rank_zero():
                 from src.utils import convert_checkpoint
                 convert_checkpoint(save_dir)
+    
+    @property
+    def save_dir(self):
+        return os.path.join(MODEL_SAVE_DIR, self.model_name)
