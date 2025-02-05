@@ -75,14 +75,18 @@ class LauncherConfig(BaseConfig):
             procs = []
             host = nodes[0]
             pwd = os.getcwd()
+            proc_port = random.randint(10000, 20000)
             for i, n in enumerate(nodes):
                 if self.accelerate_config:
+                    acc = read_magic(self.accelerate_config)
+                    assert len(nodes) == acc.get("num_machines", 1), "Number of nodes should be equal to num_machines"
                     procs.append(subprocess.Popen(
                         ["ssh", n] 
                         + ["cd", pwd, "&&"]
                         + [sys.executable, "-m", "accelerate.commands.launch"]
                         + ["--machine_rank", str(i)]
                         + ["--main_process_ip", host]
+                        + ["--main_process_port", str(proc_port)]
                         + ["--config_file", self.accelerate_config]
                         + ["run.py"] + main_args()
                     ))
