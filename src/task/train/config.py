@@ -20,10 +20,10 @@ import transformers
 import trl
 import os
 import inspect
-
+import peft
 
 get_optimizer = create_get_fn(torch.optim, type_hint=torch.optim.Optimizer)
-
+get_peft_config = create_get_fn(peft, type_hint=peft.PeftConfig)
 def create_trainer(config: TrainConfig):
     """Config를 사용하여 Trainer를 생성합니다. Deepspeed config가 있을 경우 필요한 설정을 추가합니다."""
     
@@ -63,18 +63,24 @@ def create_trainer(config: TrainConfig):
     kwargs["processing_class"] = tokenizer
     kwargs["args"] = train_args
     
+    
+    
+    # DPO / RL model init
     if config.ref_model:
         ref_model = config.ref_model()
         ref_model.eval()
         kwargs["ref_model"] = ref_model
-
     if config.reward_model:
         kwargs["reward_model"] = config.reward_model()
     if config.dataloader.collate_fn:
         kwargs["data_collator"] = get_collate_fn(config.dataloader.collate_fn)
-    # load data
-
     
+    # setup peft
+    if hasattr(config.training_arguments, "peft_config"):
+        kwargs["peft_config"] = get_peft_config(CallConfig(**config.training_arguments.peft_config))()
+        if "ref_model" in kwargs:
+            del kwargs["ref_model"]
+    # load data
     datamodule = DataModule(
         config.reader,
         config.dataset,
@@ -148,13 +154,17 @@ class TrainConfig(TaskConfig):
             self.tokenizer().save_pretrained(save_dir)
         trainer.train()
         print(f"{rank()}/{world_size()}: training finished")
-        if is_rank_zero():
-            self.model.path = save_dir
-            self.dump(os.path.join(save_dir, "config.yaml"))
         
         if not getattr(self.training_arguments, "deepspeed", {}):
             # deepspeed 환경에서 이거 부르면 영원히 끝나지 않는다. 대신 convert_checkpoint를 부를 것
-            trainer.save_model(save_dir)
+            trainer.model.save_pretrained(save_dir)
+            if getattr(self.training_arguments, "peft_config", None):
+                merged_model = trainer.model.merge_and_unload()
+                merged_model.save_pretrained(save_dir)
+            else:
+                # full finetuning 할때 왜 이상하게 저장된거지?? (deepspeed 3)
+                trainer.model.save_pretrained(save_dir)
+                trainer.tokenizer.save_pretrained(save_dir)
         else:
             if is_rank_zero():
                 from src.utils import convert_checkpoint

@@ -36,10 +36,6 @@ class LauncherConfig(BaseConfig):
     """main process 구분용이므로 건드리지 말 것"""
 
     def __call__(self):
-        is_main = self.is_main
-        self.is_main = False
-        args = {f"--{k}": v for k in ["mode", "run_config", "local_rank", "is_main"] if (v:=getattr(self, k, None))}
-        main_args = lambda: concat(*[[k, v] for k, v in args.items()])
         # assert sum([bool(self.accelerate_config), bool(self.deepspeed_config), bool(self.slurm_config)]) <= 1, "Only one of accelerate, deepspeed, slurm can be used"
 
         # copy config files to output directory
@@ -49,7 +45,7 @@ class LauncherConfig(BaseConfig):
             "evaluation": EvaluationConfig
         }[self.mode]
         config = config_cls.load(self.run_config)
-        if is_main:
+        if self.is_main:
             output_dir = config.save_dir
             os.makedirs(output_dir, exist_ok=True)
             launch_config = self.model_dump()
@@ -63,6 +59,9 @@ class LauncherConfig(BaseConfig):
                 launch_config["deepspeed_config"] = f"{output_dir}/deepspeed_config.yaml"
             write_magic(f"{output_dir}/launch_config.yaml", launch_config)
         
+        self.is_main = False
+        args = {f"--{k}": v for k in ["mode", "run_config", "local_rank", "is_main"] if (v:=getattr(self, k, None))}
+        main_args = lambda: concat(*[[k, v] for k, v in args.items()])
         if self.nodes:
             # 각각의 node마다 수행할 accelerate config를 복사하여 저장
             nodes = parse_nodelist(self.nodes)
