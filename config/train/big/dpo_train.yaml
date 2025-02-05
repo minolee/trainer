@@ -4,11 +4,16 @@ base_trainer: DPOTrainer
 reader:
   sources:
     - name: test
-      source: rsc/data/preference/processed/dpo_1cycle_241016.jsonl
+      source: rsc/data/preference/helpfulness/dpo_1cycle_241016.jsonl
       split:
         type: train
       limit: 1000
-      reader: read_preference
+    - name: test2
+      source: rsc/data/preference/helpfulness/dpo_kt-IF_v1_241213.jsonl
+      split:
+        type: train
+      limit: 1000
+  reader: read_preference
 
 dataset:
   prompt: Llama31
@@ -49,17 +54,17 @@ training_arguments:
   save_only_model: true
   gradient_checkpointing: true # set true to save more memory
   # report_to: tensorboard
-  deepspeed:
-    num_gpus: 8
-    zero_optimization:
-      stage: 3
-      offload_param:
-        device: cpu
-        pin_memory: true
-      offload_optimizer:
-        device: cpu
-        pin_memory: true
-    # 여기서 batch_size를 정의하지 말고 training_arguments에서 정의할 것
-    gradient_clipping: 1.0
-    fp16: 
-      enabled: auto
+  # deepspeed:
+  #   num_gpus: 8
+  #   zero_optimization:
+  #     stage: 3
+  #     offload_param:
+  #       device: cpu
+  #       pin_memory: true
+  #     offload_optimizer:
+  #       device: cpu
+  #       pin_memory: true
+  #   # 여기서 batch_size를 정의하지 말고 training_arguments에서 정의할 것
+  #   gradient_clipping: 1.0
+  #   fp16: 
+  #     enabled: auto

@@ -99,8 +99,8 @@ class ReaderElem(BaseConfig):
         
         load_buf = list(reader(self.source))
         if self.limit and self.limit > 0:
-            ws = world_size()
-            load_buf = load_buf[:self.limit // ws]
+            # ws = world_size()
+            load_buf = load_buf[:self.limit]
         self.split_buf = {k: v for k, v in zip(["train", "dev", "test"], self.split(load_buf))}
         # self.feature = self.feature or (
         #     "preference" if isinstance(load_buf[0].elem[-1], PreferenceMessage) else "prompt_completion"

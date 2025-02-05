@@ -11,7 +11,14 @@
 # How to run
 `python run.py --mode [train | inference | evaluation] --config <config_path>`
 
-Deepspeed 사용 시 `deepspeed --num_gpus X run.py --mode [train | inference | evaluation] --config <config_path>`
+### Accelerate
+`accelerate launch --config_file <accelerate_config_path> run.py --mode [train | inference | evaluation] --config <config_path>`
+
+Accelerate의 config 파일은 자동으로 옮겨지지 않습니다. 
+
+### Deepspeed
+`deepspeed --num_gpus X run.py --mode [train | inference | evaluation] --config <config_path>`
+
 
 ## Deeper inside
 데이터 준비, 모델 준비, 학습/추론/평가 준비 -> 실행 의 과정으로 이루어져 있습니다.

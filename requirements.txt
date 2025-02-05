@@ -2,6 +2,7 @@ torch
 
 pyyaml
 pydantic
+tyro
 
 datasets
 tokenizers
@@ -10,4 +11,3 @@ accelerate
 trl
 
 deepspeed; platform_system == "Linux"
-mpi4py; platform_system == "Linux"
