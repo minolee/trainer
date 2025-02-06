@@ -3,7 +3,7 @@ from __future__ import annotations
 from src.base import BaseConfig, CallConfig
 from ..config import TaskConfig
 from src.data.reader import ReaderConfig
-from src.data.dataset import DatasetConfig
+from src.data.dataset import FormatConfig
 from src.data.dataloader import DataLoaderConfig
 from src.data import DataModule
 from src.tokenizer import TokenizerConfig
@@ -30,7 +30,7 @@ class InferenceConfig(TaskConfig):
     experiment_name: str = Field(default_factory=lambda: datetime.strftime(datetime.now(), "%Y%M%d_%H%m%s"))
     # data configs
     reader: ReaderConfig
-    dataset: DatasetConfig
+    dataset: FormatConfig
     dataloader: DataLoaderConfig
 
     # generation configs

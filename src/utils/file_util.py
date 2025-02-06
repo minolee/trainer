@@ -3,7 +3,7 @@ import csv
 # import ruamel.yaml as yaml
 import yaml
 import os
-from src.base import create_register_deco
+from .func_util import create_register_deco
 
 __all__ = ["iter_dir", "read_txt", "read_jsonl", "read_csv", "read_tsv", "read_yaml", "read_magic",
               "write_txt", "write_jsonl", "write_csv", "write_tsv", "write_yaml", "write_magic"]

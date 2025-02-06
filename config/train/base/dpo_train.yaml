@@ -5,18 +5,11 @@ reader:
   sources:
     - name: test
       source: rsc/data/preference/processed/dpo_1cycle_241016.jsonl
-      split:
-        type: train
+      split: train
       limit: 500
       reader: read_preference
 
-
-
-dataset:
-  prompt: Llama31
-  dataset: 
-    name: PreferenceDataset
-    max_length: 1024
+format: format_preference
 
 dataloader:
   shuffle: true

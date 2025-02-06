@@ -1,4 +1,4 @@
-from src.base import create_get_fn
+from src.utils import create_get_fn
 import transformers, trl
 
 from .dpo_trainer import DPOTrainer

@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 import accelerate
-from src.base import BaseConfig, CallConfig, create_get_fn
+from src.base import BaseConfig, CallConfig
 from src.data import DataModule
 from src.data.reader import ReaderConfig, PromptTemplate, get_prompt
-from src.data.dataset import DatasetConfig
+from src.data.dataset import FormatConfig
 from src.data.dataloader import get_collate_fn, DataLoaderConfig
 from src.model import ModelConfig
 from src.tokenizer import TokenizerConfig
 from src.env import MODEL_SAVE_DIR
-from src.utils import world_size, is_rank_zero, rank, drop_unused_args
+from src.utils import world_size, is_rank_zero, rank, drop_unused_args, create_get_fn
 
 from .trainer import get_trainer
 from ..config import TaskConfig
@@ -72,17 +72,15 @@ def create_trainer(config: TrainConfig):
         kwargs["reward_model"] = config.reward_model()
     if config.dataloader.collate_fn:
         kwargs["data_collator"] = get_collate_fn(config.dataloader.collate_fn)
-    # load data
-
     
+    # load data
     datamodule = DataModule(
         config.reader,
-        config.dataset,
+        config.format,
         config.tokenizer
     )
 
     datamodule.prepare_data(["train", "dev"])
-    datamodule.setup(["train", "dev"]) # type: ignore
     datamodule.info()
     kwargs["train_dataset"] = datamodule["train"]
     kwargs["eval_dataset"] = datamodule["dev"]
@@ -115,7 +113,7 @@ class TrainConfig(TaskConfig):
     base_trainer: str | CallConfig = "Trainer"
     
     reader: ReaderConfig
-    dataset: DatasetConfig
+    format: str | CallConfig
     dataloader: DataLoaderConfig
     tokenizer: TokenizerConfig
     

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 from typing import Iterable, Any
-from src.base import create_get_fn, BaseMessage, PreferenceMessage, DataElem
-from src.utils import read_magic, rank_iter
+from src.base import BaseMessage, PreferenceMessage, DataElem
+from src.utils import create_get_fn
 
 
 __all__ = ["get_reader"]
