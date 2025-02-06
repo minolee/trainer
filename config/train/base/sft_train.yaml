@@ -4,10 +4,7 @@ base_trainer: SFTTrainer
 reader:
   sources:
     - name: test
-      source: rsc/data/AiHub-Largeai_SFT_QA.jsonl
-      split:
-        type: mixed
-        split_ratio: "9:1"
+      source: rsc/data/sft/AiHub-Largeai_SFT_QA.jsonl
       limit: 500
       reader: read_simple
 

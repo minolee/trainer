@@ -5,9 +5,9 @@ from src.base.base_message import PreferenceMessage
 from src.utils import world_size, rank_zero_only
 from .reader import get_reader
 from enum import Enum
-from typing import Iterable, TypeVar
+from typing import Iterable, TypeVar, Literal
 from pydantic import Field
-
+from datasets import load_dataset, DatasetDict
 T = TypeVar("T")
 
 class DataType(Enum):
@@ -75,8 +75,8 @@ class ReaderElem(BaseConfig):
     """데이터셋 이름, optional"""
     source: str
     """데이터셋 경로"""
-    split: SplitConfig
-    """데이터셋 분할 방법"""
+    split: str | None = None
+    """데이터셋 분할 방법. https://huggingface.co/docs/datasets/v3.2.0/en/loading#slice-splits 참고"""
     limit: int | None = None
     """설정시 데이터셋 총량 제한"""
 
@@ -97,11 +97,21 @@ class ReaderElem(BaseConfig):
         assert self.reader is not None, f"reader_fn of {self.name or self.source} is not defined"
         reader = get_reader(self.reader)
         
-        load_buf = list(reader(self.source))
+        dataset = load_dataset(
+            path="json",
+            name=self.name,
+            data_files=self.source,
+            split=self.split
+        )
         if self.limit and self.limit > 0:
-            # ws = world_size()
-            load_buf = load_buf[:self.limit]
-        self.split_buf = {k: v for k, v in zip(["train", "dev", "test"], self.split(load_buf))}
+            dataset = DatasetDict({k: dataset[k].select(range(self.limit)) for k in dataset.keys()})
+
+        dataset = dataset.map(reader).filter(lambda x: x is not None)
+
+        # load_buf = list(reader(self.source))
+        # if self.limit and self.limit > 0:
+        #     load_buf = load_buf[:self.limit]
+        # self.split_buf = {k: v for k, v in zip(["train", "dev", "test"], self.split(load_buf))}
         # self.feature = self.feature or (
         #     "preference" if isinstance(load_buf[0].elem[-1], PreferenceMessage) else "prompt_completion"
         # ) # 이부분 더러워서 수정 필요 -> 일단 안써도 될듯?

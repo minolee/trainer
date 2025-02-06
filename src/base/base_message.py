@@ -6,8 +6,8 @@ __all__ = ["DataElem", "Speaker", "BaseMessage", "PreferenceMessage"]
 
 class DataElem(BaseModel):
     """학습 또는 inference에 사용하는단위 element. metadata와 message list로 구성"""
-    data_source: str
-    data_index: int
+    data_source: str | None = None
+    data_index: int | None = None
     elem: list[BaseMessage]
 
 class Speaker(Enum):
