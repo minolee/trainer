@@ -32,8 +32,8 @@ def iter_dir(p, *, prefix=None, filter_prefix=None, postfix=None, filter_postfix
         for f in fs:
             if prefix and not f.startswith(prefix): continue
             if filter_prefix and f.startswith(filter_prefix): continue
-            if postfix and not f.startswith(postfix): continue
-            if filter_postfix and f.startswith(filter_postfix): continue
+            if postfix and not f.endswith(postfix): continue
+            if filter_postfix and f.endswith(filter_postfix): continue
             path = os.path.join(p, f)
             if not return_absolute: path = path.replace(p, "").lstrip("/")
             yield path
