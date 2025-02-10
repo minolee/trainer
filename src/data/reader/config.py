@@ -50,7 +50,7 @@ class ReaderConfig(BaseConfig):
             source.reader = source.reader or self.reader
             source()
     
-    def __getitem__(self, key: str) -> Dataset | IterableDataset:
+    def __getitem__(self, key: str) -> Dataset | IterableDataset | None:
         result = []
         for source in self.sources:
             if key in source:
@@ -58,6 +58,8 @@ class ReaderConfig(BaseConfig):
                 result.append(source[key])
             # raise KeyError(f"{key} is not in the data")
         # return Dataset.from_list(result, features=get_features(self.sources[0].feature)())
+        if len(result) == 0:
+            return None
         return concatenate_datasets(result)
     
     @rank_zero_only

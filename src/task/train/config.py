@@ -70,7 +70,7 @@ def create_trainer(config: TrainConfig):
 
     if config.reward_model:
         kwargs["reward_model"] = config.reward_model()
-    if config.dataloader.collate_fn:
+    if config.dataloader is not None and config.dataloader.collate_fn:
         kwargs["data_collator"] = get_collate_fn(config.dataloader.collate_fn)
     
     # load data
@@ -114,7 +114,7 @@ class TrainConfig(TaskConfig):
     
     reader: ReaderConfig
     format: str | CallConfig
-    dataloader: DataLoaderConfig
+    dataloader: DataLoaderConfig | None = None
     tokenizer: TokenizerConfig | None = None
     
     model: ModelConfig
@@ -138,9 +138,9 @@ class TrainConfig(TaskConfig):
         """Config를 사용하여 모델을 학습합니다."""
         save_dir = self.save_dir
         os.makedirs(save_dir, exist_ok=True)
-        trainer = create_trainer(self)
         if self.tokenizer is None:
             self.tokenizer = TokenizerConfig(path=self.model.path)
+        trainer = create_trainer(self)
         if is_rank_zero():
             print("start training...")
             print(self.training_arguments)

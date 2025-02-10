@@ -11,16 +11,13 @@ reader:
 
 format: format_preference
 
-dataloader:
-  shuffle: true
-  num_workers: 0
-  collate_fn: preference_collate_fn
-
-tokenizer:
-  path: openai-community/gpt2
+# dataloader:
+#   shuffle: true
+#   num_workers: 0
+  # collate_fn: preference_collate_fn
 
 model:
-  path: openai-community/gpt2
+  path: Qwen/Qwen2-0.5B-Instruct
   device: cpu
 
 
