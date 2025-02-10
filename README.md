@@ -9,15 +9,24 @@
 * Deepspeed 사용시 `python==3.10`으로 세팅해야 합니다.
 
 # How to run
-`python run.py --mode [train | inference | evaluation] --config <config_path>`
+`python run.py --mode [train | inference | evaluation] --run_config <config_path>`
+
+`python run.py --help` 를 치면 사용 방법을 알 수 있습니다.
 
 ### Accelerate
-`accelerate launch --config_file <accelerate_config_path> run.py --mode [train | inference | evaluation] --config <config_path>`
+`python run.py --mode [train | inference | evaluation] --run_config <config_path> --accelerate_config <accelerate_config_path>`
 
-Accelerate의 config 파일은 자동으로 옮겨지지 않습니다. 
+자동으로 accelerate launch를 수행합니다.
+
+### multi-node (beta)
+`python run.py --mode [train | inference | evaluation] --run_config <config_path> --accelerate_config <accelerate_config_path> --nodes [nodelist]`
+
+slurm style node list를 전달 시 각각의 node에 ssh command를 수행하는 방식으로 multinode 학습을 진행합니다.
+
+이 때 반드시 accelerate config에 정의된 `num_machines`와 전달한 node 수가 같은지 확인해 주세요.
 
 ### Deepspeed
-`deepspeed --num_gpus X run.py --mode [train | inference | evaluation] --config <config_path>`
+미구현, 하지만 accelerate config에 deepspeed를 사용할 수 있습니다.
 
 
 ## Deeper inside
@@ -48,17 +57,9 @@ Raw data를 중간 형태(list of BaseMessage) 형태로 만듭니다.
   * limit: 데이터 수량 제한 (optional)
 * reader: 데이터를 읽는 방법을 정의. [reader_fn](https://github.com/minolee/mlops/blob/main/src/data/reader/reader.py)에 정의된 함수를 사용할 것
 
-#### [Dataset](https://github.com/minolee/mlops/blob/main/src/data/dataset/config.py)
-List of BaseMessage를 tokenizer를 받아 와서 모델의 입력 tensor로 가공합니다. torch.utils.data.Dataset을 만드는 과정을 자동화하는 것이라고 생각하면 됩니다. 
+#### [Formatter](https://github.com/minolee/mlops/blob/main/src/data/dataset/format_fn.py)
+List of BaseMessage를 trainer에 맞는 형태로 가공합니다. 예를 들어, DPOTrainer의 경우 [preference dataset 형식](https://huggingface.co/docs/trl/dataset_formats#preference)으로 가공하는 과정입니다.
 
-Base model, Task, 또는 학습 방법별로 다른 class를 사용합니다.
-
-각각의 class에서는 stage별로 다른 방식으로 데이터를 가공합니다. 예를 들어, sft 학습 과정에서는 `label` 이라는 key가 있지만, 추론 과정에서는 해당 키가 존재하지 않는 방식입니다.
-
-* [prompt](https://github.com/minolee/mlops/blob/main/src/data/dataset/prompt.py): 어떤 instruction prompt를 사용할지 정의합니다.
-* [dataset](https://github.com/minolee/mlops/blob/main/src/data/dataset/dataset.py): 모델의 입력 tensor로 만드는 dataset class를 정의합니다.
-  * name: 데이터셋 class 이름
-  * max_length: tokenize 결과 max_length 이상의 data는 제거됩니다.
 
 #### [DataLoader](https://github.com/minolee/mlops/blob/main/src/data/dataloader/config.py)
 <strike>
@@ -72,7 +73,7 @@ Dataset을 받아 DataLoader를 만드는 과정을 제어합니다. 이 과정�
 </strike>
 
 250106 변경: Dataloader는 hf trainer의 argument로 넘기는 방식으로 변경하였음
-
+250210 변경: HF Dataset으로 변경함. 중간 data 구조만 남김
 
 ### 모델 준비
 모델은 3가지 로딩 방식이 있습니다.
@@ -80,20 +81,6 @@ Dataset을 받아 DataLoader를 만드는 과정을 제어합니다. 이 과정�
 * load from hub
 * load from local
 * load from scratch
-
-
-## 학습 준비
-데이터와 모델이 준비되었다면 이제 학습을 수행할 수 있습니다!
-
-빠진 것들(loss, optimizer, scheduler)등을 정의하면 완성입니다!
-
-
-
-## Inference 준비
-
-## Evaluation 준비
-Ongoing
-
 
 ## Develop
 
@@ -105,20 +92,20 @@ https://minolee.github.io/mlops/
 ### Code Concept
 목적이 있는 모든 config는 callable입니다. config를 로드한 뒤 call하면 목적에 맞는 object를 반환하거나(예시: DatasetConfig), 프로세스를 실행합니다(예시: TrainConfig).
 
-따라서, config를 새로 만드는 경우는 완전히 새로운 process가 필요한 것이라고 생각하면 됩니다. 기존 process를 개선하거나 기능을 추가하고 싶은 경우에는 해당 process에 필요한 추가 기능을 구현한 뒤 config에 동작 제어를 추가해 주세요.
+따라서, config를 새로 만드는 경우는 완전히 새로운 process가 필요한 것이라고 생각하면 됩니다. 기존 process를 개선하거나 기능을 추가하고 싶은 경우에는 해당 process를 상속하는 subclass를 만든 뒤, 필요한 추가 기능을 구현하고 config에 동작 제어를 추가해 주세요.
 
 
 ## TODO LIST
 우선순위별 정리
 
-* <strike>Deepspeed 적용</strike> (완료)
 * Callbacks
-* Peft
-* RL
-  * DPO
-* Evaluation 구현
+* Peft (완료)
+* RL (완료)
+  * DPO (완료)
+  * GRPO (진행중)
+* <strike>Evaluation 구현</strike> ([lm-eval-harness](https://github.com/EleutherAI/lm-evaluation-harness) 사용 권장)
 * Interactive inference
-* Dialogue Packing
+* <strike>Dialogue Packing</strike> (SFTTrainer에 포함됨)
 
 ## Author
 - Minho Lee

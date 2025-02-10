@@ -2,7 +2,6 @@
 from src.base import CallConfig
 from .reader import ReaderConfig
 from .dataset import get_format_fn
-from .dataloader import DataLoaderConfig
 from src.tokenizer import TokenizerConfig
 from src.utils import rank_zero_only
 from transformers import PreTrainedTokenizer
@@ -11,8 +10,6 @@ __all__ = ['DataModule']
 
 
 class DataModule:
-    # LightningDataModule이 dataset이랑 dataloader를 합쳐놓은 것인데 dataset이랑 dataloader가 지금 분리돼있어서 어떻게 구현해야 좋을지 생각해 봐야 함
-
     def __init__(
         self, 
         reader_config: ReaderConfig,
