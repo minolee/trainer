@@ -5,9 +5,18 @@ from src.base.base_message import PreferenceMessage
 from src.utils import world_size, rank_zero_only
 from .reader import get_reader
 from enum import Enum
-from typing import Iterable, TypeVar
-from pydantic import Field
-
+from typing import Iterable, TypeVar, Literal
+from pydantic import ConfigDict, Field
+from datasets import (
+    load_dataset, 
+    DatasetDict, 
+    Dataset, 
+    IterableDataset, 
+    IterableDatasetDict,
+    concatenate_datasets,
+    DownloadMode
+)
+# from deprecated import deprecated
 T = TypeVar("T")
 
 class DataType(Enum):
@@ -28,7 +37,7 @@ class ReaderConfig(BaseConfig):
     sources: list[ReaderElem]
     """데이터를 읽어오는 방법을 정의하는 ReaderElem들"""
 
-    lazy: bool = False # load only when needed
+    # lazy: bool = False # load only when needed
     reader: str | CallConfig | None = None 
     """ReaderElem에 reader_fn이 없을 때 사용할 reader_fn"""
 
@@ -41,17 +50,17 @@ class ReaderConfig(BaseConfig):
             source.reader = source.reader or self.reader
             source()
     
-    def __getitem__(self, key: str) -> list[DataElem]:
+    def __getitem__(self, key: str) -> Dataset | IterableDataset | None:
         result = []
         for source in self.sources:
             if key in source:
                 # result.extend([x.to_dict() for x in source[key]])
-                result.extend(source[key])
-        if len(result) == 0:
-            return []
+                result.append(source[key])
             # raise KeyError(f"{key} is not in the data")
         # return Dataset.from_list(result, features=get_features(self.sources[0].feature)())
-        return result
+        if len(result) == 0:
+            return None
+        return concatenate_datasets(result)
     
     @rank_zero_only
     def info(self):
@@ -62,7 +71,8 @@ class ReaderConfig(BaseConfig):
         print("Number of sources:", len(self.sources))
         for k in DataType.__members__.keys():
             try:
-                print(f"{k} split: {len(self[k.lower()])}")
+                if isinstance(d:=self[k.lower()], Dataset):
+                    print(f"{k} split: {len(d)}")
             except:
                 pass
         
@@ -70,13 +80,15 @@ class ReaderConfig(BaseConfig):
 
 
 class ReaderElem(BaseConfig):
+    
+    model_config = ConfigDict(arbitrary_types_allowed=True)
     """개별 파일을 읽어오는 방법 정의. call하는 경우 config에 맞게 데이터를 읽은 뒤 split을 진행함."""
     name: str | None = None
     """데이터셋 이름, optional"""
     source: str
     """데이터셋 경로"""
-    split: SplitConfig
-    """데이터셋 분할 방법"""
+    split: str | None = None
+    """데이터셋 분할 방법. https://huggingface.co/docs/datasets/v3.2.0/en/loading#slice-splits 참고"""
     limit: int | None = None
     """설정시 데이터셋 총량 제한"""
 
@@ -84,9 +96,10 @@ class ReaderElem(BaseConfig):
     """Raw data를 Message 형태로 변환하는 함수"""
 
     # feature: str | None = None
-
+    use_cache: bool = False
     # __load_buf: list[DataElem] = Field(default_factory=list, exclude=True)
-    split_buf: dict[str, list[DataElem]] = Field(default_factory=dict, exclude=True)
+    dataset: DatasetDict | IterableDatasetDict | None = Field(default=None, exclude=True)
+    # split_buf: dict[str, list[DataElem]] = Field(default_factory=dict, exclude=True)
     """loaded data"""
 
     def __call__(
@@ -97,32 +110,44 @@ class ReaderElem(BaseConfig):
         assert self.reader is not None, f"reader_fn of {self.name or self.source} is not defined"
         reader = get_reader(self.reader)
         
-        load_buf = list(reader(self.source))
+        dataset = load_dataset(
+            path="json",
+            name=self.name,
+            data_files=self.source,
+            split=self.split,
+            download_mode=DownloadMode.FORCE_REDOWNLOAD if not self.use_cache else DownloadMode.REUSE_CACHE_IF_EXISTS
+        )
+
+        if isinstance(dataset, Dataset):
+            dataset = DatasetDict({"train": dataset})
+        elif isinstance(dataset, IterableDataset):
+            dataset = IterableDatasetDict({"train": dataset})
         if self.limit and self.limit > 0:
-            # ws = world_size()
-            load_buf = load_buf[:self.limit]
-        self.split_buf = {k: v for k, v in zip(["train", "dev", "test"], self.split(load_buf))}
-        # self.feature = self.feature or (
-        #     "preference" if isinstance(load_buf[0].elem[-1], PreferenceMessage) else "prompt_completion"
-        # ) # 이부분 더러워서 수정 필요 -> 일단 안써도 될듯?
+            dataset = DatasetDict({k: dataset[k].select(range(self.limit)) for k in dataset.keys()})
+        self.dataset = dataset.map(reader).filter(lambda x: x is not None)
     
     def __len__(self):
-        return sum(len(x) for x in self.split_buf.values())
+        assert self.dataset, "Dataset not initialized"
+        return sum(len(x) for x in self.dataset.values())
 
     def __contains__(self, key: str):
-        return key in self.split_buf
+        assert self.dataset, "Dataset not initialized"
+        return key in self.dataset
 
-    def __getitem__(self, key: str) -> list[DataElem]:
-        return self.split_buf[key]
+    def __getitem__(self, key: str) -> Dataset | IterableDataset:
+        assert self.dataset, "Dataset not initialized"
+        return self.dataset[key]
 
     def info(self):
+        assert self.dataset, "Dataset not initialized"
         print(f"Source: {self.source}")
         print(f"Number of data: {len(self)}")
 
-        if all(len(x) != len(self) for x in self.split_buf.values()):
-            print("Splitted length", {k: len(v) for k, v in self.split_buf.items()})
+        if all(len(x) != len(self) for x in self.dataset.values()):
+            print("Splitted length", {k: len(v) for k, v in self.dataset.items()})
         print(f"Reader: {self.reader.name if isinstance(self.reader, CallConfig) else self.reader}")
 
+# @deprecated
 class SplitConfig(BaseConfig):
     """데이터셋을 분할하는 방법 정의"""
     type: DataType = DataType.MIXED

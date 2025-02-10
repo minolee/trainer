@@ -10,7 +10,7 @@ from transformers.utils import is_peft_available
 import inspect
 from typing import Any
 
-class DPOTrainer(trl.DPOTrainer):
+class _DPOTrainer(trl.DPOTrainer):
     r"""
     Initialize DPOTrainer.
 

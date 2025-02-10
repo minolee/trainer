@@ -1,4 +1,4 @@
-from src.base import create_get_fn
+from src.utils import create_get_fn
 import torch
 import torch.nn.functional as F
 __all__ = ["get_loss_fn"]

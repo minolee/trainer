@@ -5,29 +5,19 @@ reader:
   sources:
     - name: test
       source: rsc/data/preference/processed/dpo_1cycle_241016.jsonl
-      split:
-        type: train
+      split: train
       limit: 500
       reader: read_preference
 
+format: format_preference
 
-
-dataset:
-  prompt: Llama31
-  dataset: 
-    name: PreferenceDataset
-    max_length: 1024
-
-dataloader:
-  shuffle: true
-  num_workers: 0
-  collate_fn: preference_collate_fn
-
-tokenizer:
-  path: openai-community/gpt2
+# dataloader:
+#   shuffle: true
+#   num_workers: 0
+  # collate_fn: preference_collate_fn
 
 model:
-  path: openai-community/gpt2
+  path: Qwen/Qwen2-0.5B-Instruct
   device: cpu
 
 

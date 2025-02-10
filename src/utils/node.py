@@ -4,6 +4,7 @@ from socket import gethostname
 def parse_nodelist(nodelist: str) -> list:
     """
     Slurm의 nodelist 문자열을 파싱하여 실제 노드 이름 리스트로 반환합니다.
+    (ChatGPT generated)
     
     예제:
         "node[01-03,05]" → ["node01", "node02", "node03", "node05"]

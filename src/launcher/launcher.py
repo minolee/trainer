@@ -25,15 +25,17 @@ class LauncherConfig(BaseConfig):
     run_config: str
     """Runnable config file path"""
     local_rank: int | None = None
-    """for distributed"""
+    """Distributed 환경을 위한 값. 자동 설정되므로 수동으로 설정하지 마세요."""
     accelerate_config: str | None = None
+    """accelerate 기반으로 실행하고 싶을 경우, accelerate config 파일의 path를 입력"""
     deepspeed_config: str | None = None
+    """deepspeed 기반으로 실행하고 싶을 경우, deepspeed config 파일의 path를 입력 (미구현)"""
 
     nodes: str | None = None
     """node를 미리 정해줄 경우 각각의 node마다 process를 실행함. 반드시 accelerate 또는 deepspeed와 함께 사용할 것"""
 
     is_main: bool = True
-    """main process 구분용이므로 건드리지 말 것"""
+    """main process 구분용. 수동으로 설정하지 마세요."""
 
     def __call__(self):
         is_main = self.is_main

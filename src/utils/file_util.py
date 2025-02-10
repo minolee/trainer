@@ -3,7 +3,7 @@ import csv
 # import ruamel.yaml as yaml
 import yaml
 import os
-from src.base import create_register_deco
+from .func_util import create_register_deco
 
 __all__ = ["iter_dir", "read_txt", "read_jsonl", "read_csv", "read_tsv", "read_yaml", "read_magic",
               "write_txt", "write_jsonl", "write_csv", "write_tsv", "write_yaml", "write_magic"]
@@ -32,8 +32,8 @@ def iter_dir(p, *, prefix=None, filter_prefix=None, postfix=None, filter_postfix
         for f in fs:
             if prefix and not f.startswith(prefix): continue
             if filter_prefix and f.startswith(filter_prefix): continue
-            if postfix and not f.startswith(postfix): continue
-            if filter_postfix and f.startswith(filter_postfix): continue
+            if postfix and not f.endswith(postfix): continue
+            if filter_postfix and f.endswith(filter_postfix): continue
             path = os.path.join(p, f)
             if not return_absolute: path = path.replace(p, "").lstrip("/")
             yield path

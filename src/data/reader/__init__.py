@@ -1,5 +1,3 @@
-"""raw data to middle structure (i.e. input prompt)"""
+"""raw data를 중간 구조로 바꾸는 함수들"""
 from .config import *
 from .reader import *
-from ..dataset.prompt import *
-from ..dataset.dataset import *

@@ -1,5 +1,5 @@
 from __future__ import annotations
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, ValidationError
 __all__ = ["BaseConfig", "CallConfig"]
 
 
@@ -12,19 +12,19 @@ class BaseConfig(BaseModel):
 
     """
     model_config = ConfigDict(extra="allow", use_enum_values=True)
-    
-    no_save: bool | None = Field(None, exclude=True)
-    """multi-node training 중 중복 저장을 막기 위해 사용"""
 
     def dump(self, path):
-        if self.no_save: return
         from src.utils import write_magic
         write_magic(path, self.model_dump(exclude_none=True))
     
     @classmethod
     def load(cls, path):
         from src.utils import read_magic
-        return cls(**read_magic(path)) # type: ignore
+        try:
+            return cls(**read_magic(path)) # type: ignore
+        except ValidationError as e:
+            print(f"Error loading {cls.__name__}")
+            raise e
 
 class CallConfig(BaseConfig):
     """함수 이름을 불러오고 kwarg를 전달하는데 사용하는 config"""

@@ -3,6 +3,7 @@ torch
 pyyaml
 pydantic
 tyro
+deprecated
 
 datasets
 tokenizers

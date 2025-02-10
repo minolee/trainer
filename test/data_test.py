@@ -41,7 +41,7 @@ class TestBaseData:
         decoded = tokenizer.decode(train_dataset[0]["input_ids"], skip_special_tokens=False)
         for message in msg:
             if message.speaker.type == "System": continue
-            assert prompt.wrap(message).rstrip(prompt.eot_token) in decoded
+            assert prompt.wrap(message).rstrip(prompt.eos_token) in decoded
         
     def test_loss_mask(self, base_datamodule: DataModule):
         train_dataset = base_datamodule.prepared["train"][0]

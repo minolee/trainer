@@ -1,9 +1,9 @@
-"""BaseMessage + prompt to torch dataset"""
+"""unused"""
 from __future__ import annotations
 import torch
 from torch.utils.data import Dataset as D
 from transformers import PreTrainedTokenizer
-from src.base import create_get_fn, Speaker
+from src.utils import create_get_fn
 from .prompt import PromptTemplate
 from src.base import BaseMessage, PreferenceMessage, DataElem
 from typing import Iterable
@@ -54,10 +54,10 @@ class BaseDataset(D):
 
     def merge_system_prompt(self, messages: list[BaseMessage]) -> list[BaseMessage]:
         # system message should be at the beginning
-        if messages[0].speaker == Speaker.SYSTEM:
+        if messages[0].speaker.lower() == "system":
             messages[0].message = self.prompt.system_prompt + "\n" + messages[0].message
         else:
-            messages.insert(0, BaseMessage(speaker=Speaker.SYSTEM, message=self.prompt.system_prompt))
+            messages.insert(0, BaseMessage(speaker="system", message=self.prompt.system_prompt))
         return messages
 
 get_dataset = create_get_fn(__name__, type_hint=BaseDataset)
@@ -80,7 +80,7 @@ class SFTDataset(BaseDataset):
             input_ids.append(tok["input_ids"].squeeze()) # type: ignore
             attention_mask.append(tok["attention_mask"].squeeze()) # type: ignore
             loss_mask.append(torch.tensor([
-                message.speaker.type == "Assistant" and (self.train_every_assistant_message or i == len(messages) - 1)
+                message.speaker.lower() == "assistant" and (self.train_every_assistant_message or i == len(messages) - 1)
             ] * tok["input_ids"].shape[-1])) # type: ignore
         input_ids = torch.cat(input_ids, dim=0)[:-1] # exclude final eot token
         attention_mask = torch.cat(attention_mask, dim=0)[:-1]
