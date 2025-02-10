@@ -115,7 +115,7 @@ class TrainConfig(TaskConfig):
     reader: ReaderConfig
     format: str | CallConfig
     dataloader: DataLoaderConfig
-    tokenizer: TokenizerConfig
+    tokenizer: TokenizerConfig | None = None
     
     model: ModelConfig
     """학습을 진행할 메인 모델"""
@@ -139,6 +139,8 @@ class TrainConfig(TaskConfig):
         save_dir = self.save_dir
         os.makedirs(save_dir, exist_ok=True)
         trainer = create_trainer(self)
+        if self.tokenizer is None:
+            self.tokenizer = TokenizerConfig(path=self.model.path)
         if is_rank_zero():
             print("start training...")
             print(self.training_arguments)
