@@ -1,5 +1,5 @@
 from __future__ import annotations
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
 __all__ = ["BaseMessage", "PreferenceMessage"]
 
@@ -13,7 +13,14 @@ class BaseMessage(BaseModel):
     speaker: str
     message: str
 
-    
+    @field_validator("speaker")
+    def validate_speaker(cls, v):
+        v = v.lower()
+        if v == "midm":
+            v = "assistant"
+        return v
+
+
     def __str__(self):
         return f"{self.speaker}: {self.message}"
     
