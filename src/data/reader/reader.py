@@ -33,6 +33,6 @@ def read_preference(source: dict) -> dict | None:
         message=source["chosen"]["message"],
         rejected_message=source["rejected"]["message"]
     ))
-    return DataElem(
-        elem=messages
-    ).model_dump()
+    dl = DataElem(elem=messages)
+    result = dl.model_dump()
+    return result

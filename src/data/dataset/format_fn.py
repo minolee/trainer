@@ -3,7 +3,7 @@
 https://github.com/huggingface/trl/blob/main/trl/extras/dataset_formatting.py#L78 의 입력 부분으로 가공하는 것임
 
 """
-from src.base import DataElem
+from src.base import DataElem, BaseMessage, PreferenceMessage
 from src.utils import autocast, create_get_fn
 from .prompt import PromptTemplate
 from typing import Any
@@ -24,7 +24,7 @@ def format_sft(data: DataElem, prompt: PromptTemplate) -> dict[str, str]:
 
 
 @autocast
-def format_preference(data: DataElem) -> dict[str, str]:
+def format_preference(data: DataElem[PreferenceMessage]) -> dict[str, str]:
     """format data for preference learning"""
     result = {}
     # p = []

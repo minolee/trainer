@@ -6,7 +6,7 @@ from .dataloader import DataLoaderConfig
 from src.tokenizer import TokenizerConfig
 from src.utils import rank_zero_only
 from transformers import PreTrainedTokenizer
-from datasets import Dataset
+from datasets import Dataset, IterableDataset
 __all__ = ['DataModule']
 
 
@@ -42,8 +42,8 @@ class DataModule:
         #             print(f"Dataset: {dataset.__class__.__name__}")
         #             print(f"Number of data: {len(dataset)}")
 
-    def __getitem__(self, key: str):
+    def __getitem__(self, key: str) -> Dataset | IterableDataset | None:
+        ds = self.reader_config[key]
+        if not ds: return None
         formatter = get_format_fn(self.format_config)
-        return self.reader_config[key].map(formatter)
-            
-    
+        return ds.map(formatter)
