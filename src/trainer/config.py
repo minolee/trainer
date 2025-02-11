@@ -1,6 +1,4 @@
 from __future__ import annotations
-
-import accelerate
 from src.base import BaseConfig, CallConfig
 from src.data import DataModule
 from src.data.reader import ReaderConfig
@@ -12,7 +10,6 @@ from src.env import MODEL_SAVE_DIR
 from src.utils import world_size, is_rank_zero, rank, drop_unused_args, create_get_fn
 
 from .trainer import get_trainer
-from ..config import TaskConfig
 from pydantic import Field
 
 import torch
@@ -55,6 +52,7 @@ def create_trainer(config: TrainConfig):
     #     kwargs["compute_loss_func"] = get_loss_fn(config.loss)()
     # load model
     model = config.model()
+    assert config.tokenizer
     tokenizer = config.tokenizer()
     if not hasattr(tokenizer, "pad_token") or tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
@@ -106,7 +104,7 @@ def create_trainer(config: TrainConfig):
 
     return base_trainer(**kwargs)
 
-class TrainConfig(TaskConfig):
+class TrainConfig(BaseConfig):
 
     model_name: str 
     """모델이 저장될 이름, 학습 결과는 이 path에 저장됨"""

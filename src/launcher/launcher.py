@@ -1,3 +1,4 @@
+import accelerate
 from src.base import BaseConfig
 from typing import Literal
 import os
@@ -6,7 +7,7 @@ import shutil
 import sys
 import random
 import string
-from ..task import TrainConfig, InferenceConfig, EvaluationConfig, TaskConfig
+from ..trainer import TrainConfig
 from ..utils import parse_nodelist, is_localhost, read_magic, write_magic, concat
 __all__ = ["LauncherConfig"]
 
@@ -20,8 +21,7 @@ class LauncherConfig(BaseConfig):
     config file을 읽어서 해석하고 그에 맞는 command를 실행
     python run.py --accelerate_config 
     """
-    mode: Literal["train", "inference", "eval", "reproduce"]
-    """Run mode"""
+
     run_config: str
     """Runnable config file path"""
     local_rank: int | None = None
@@ -39,18 +39,24 @@ class LauncherConfig(BaseConfig):
 
     def __call__(self):
         is_main = self.is_main
+        is_slurm = "SLURM_JOB_ID" in os.environ
         self.is_main = False
         args = {f"--{k}": v for k in ["mode", "run_config", "local_rank", "is_main"] if (v:=getattr(self, k, None))}
         main_args = lambda: concat(*[[k, v] for k, v in args.items()])
         # assert sum([bool(self.accelerate_config), bool(self.deepspeed_config), bool(self.slurm_config)]) <= 1, "Only one of accelerate, deepspeed, slurm can be used"
 
         # copy config files to output directory
-        config_cls: TaskConfig = {
-            "train": TrainConfig,
-            "inference": InferenceConfig,
-            "evaluation": EvaluationConfig
-        }[self.mode]
-        config = config_cls.load(self.run_config)
+        
+        config = TrainConfig.load(self.run_config)
+        
+        if self.nodes:
+            # 각각의 node마다 수행할 accelerate config를 복사하여 저장
+            nodes = parse_nodelist(self.nodes)
+        else:
+            nodes = ["localhost"]
+        if is_slurm:
+            nodes = parse_nodelist(os.environ["SLURM_JOB_NODELIST"])
+        
         if is_main:
             output_dir = config.save_dir
             os.makedirs(output_dir, exist_ok=True)
@@ -58,6 +64,10 @@ class LauncherConfig(BaseConfig):
             launch_config["run_config"] = f"{output_dir}/run_config.yaml"
             shutil.copy(self.run_config, f"{output_dir}/run_config.yaml")
             if self.accelerate_config:
+                accelerate_config = read_magic(self.accelerate_config)
+                accelerate_config["num_machines"] = len(nodes)
+                accelerate_config["num_processes"] = len(nodes) * 8
+
                 shutil.copy(self.accelerate_config, f"{output_dir}/accelerate_config.yaml")
                 launch_config["accelerate_config"] = f"{output_dir}/accelerate_config.yaml"
             if self.deepspeed_config:
@@ -65,14 +75,9 @@ class LauncherConfig(BaseConfig):
                 launch_config["deepspeed_config"] = f"{output_dir}/deepspeed_config.yaml"
             write_magic(f"{output_dir}/launch_config.yaml", launch_config)
         
-        if self.nodes:
-            # 각각의 node마다 수행할 accelerate config를 복사하여 저장
-            nodes = parse_nodelist(self.nodes)
-        else:
-            nodes = ["localhost"]
-
         
-        if len(nodes) > 1 or not is_localhost(nodes[0]):
+        
+        if len(nodes) > 1 or not is_localhost(nodes[0]) and not is_slurm:
             # 각각의 node마다 수행할 accelerate config를 복사하여 저장
             procs = []
             host = nodes[0]
@@ -99,7 +104,8 @@ class LauncherConfig(BaseConfig):
             for proc in procs:
                 proc.wait()
             return
-        if any([self.accelerate_config, self.deepspeed_config]):
+        if any([self.accelerate_config, self.deepspeed_config]) and is_main:
+            # run subprocess
             run = []
             if self.accelerate_config:
                 conf = read_magic(self.accelerate_config)
