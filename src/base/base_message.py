@@ -1,7 +1,7 @@
 from __future__ import annotations
 from pydantic import BaseModel, ConfigDict, field_validator, Field
 
-__all__ = ["BaseMessage", "PreferenceMessage"]
+__all__ = ["BaseMessage", "PreferenceMessage", "Passage"]
 
 
 
@@ -24,3 +24,6 @@ class PreferenceMessage(BaseMessage):
     rejected_message: str | None = None
 
 
+class Passage(BaseModel):
+    passage_title: str = Field(..., alias="passageTitle")
+    passage: str

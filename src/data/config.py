@@ -74,7 +74,6 @@ class DataConfig(BaseConfig):
         print(f"Number of data: {len(self)}")
 
 class DataLoaderElem(BaseConfig):
-    
     model_config = ConfigDict(arbitrary_types_allowed=True)
     """개별 파일을 읽어오는 방법 정의. call하는 경우 config에 맞게 데이터를 읽은 뒤 split을 진행함."""
     name: str | None = None
