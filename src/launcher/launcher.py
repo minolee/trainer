@@ -37,6 +37,14 @@ class LauncherConfig(BaseConfig):
     is_main: bool = True
     """main process 구분용. 수동으로 설정하지 마세요."""
 
+    @property
+    def is_deepspeed(self):
+        if self.deepspeed_config:
+            return True
+        if self.accelerate_config and "deepspeed" in read_magic(self.accelerate_config):
+            return True
+        return False
+
     def __call__(self):
         is_main = self.is_main
         is_slurm = "SLURM_JOB_ID" in os.environ
@@ -106,10 +114,8 @@ class LauncherConfig(BaseConfig):
             # procs = [subprocess.Popen(["ssh", node] + _args) for node in nodes]
             for proc in procs:
                 proc.wait()
-            return
         
-        
-        if any([self.accelerate_config, self.deepspeed_config]) and is_main:
+        elif any([self.accelerate_config, self.deepspeed_config]) and is_main:
             # run subprocess
             run = []
             if self.accelerate_config:
@@ -124,10 +130,11 @@ class LauncherConfig(BaseConfig):
             else:
                 proc = subprocess.Popen(run + main_args())
                 proc.wait()
-            return
         
-        # run main
+        else:
+            load_module(output_dir)
+            config()
 
-        load_module(output_dir)
-
-        config()
+        if is_main:
+            print("Training finished")
+            

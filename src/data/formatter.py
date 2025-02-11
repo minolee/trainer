@@ -3,19 +3,18 @@
 https://github.com/huggingface/trl/blob/main/trl/extras/dataset_formatting.py#L78 의 입력 부분으로 가공하는 것임
 
 """
-from src.base import DataElem, BaseMessage, PreferenceMessage
+from src.base import Instance, BaseMessage, PreferenceMessage
 from src.utils import autocast, create_get_fn
-from .prompt import PromptTemplate
 from typing import Any
 
 __all__ = ["get_formatter"]
 
-def formatter(data: DataElem) -> dict[str, Any]:
+def formatter(data: Instance) -> dict[str, Any]:
     """format data for model training"""
     ...
 
 @autocast
-def format_sft(data: DataElem[BaseMessage]) -> dict[str, Any]:
+def format_sft(data: Instance[BaseMessage]) -> dict[str, Any]:
     """ref: https://huggingface.co/docs/trl/sft_trainer#dataset-format-support"""
     result = {
         "messages": [{"role": msg.speaker, "content": msg.message} for msg in data.elem]
@@ -24,7 +23,7 @@ def format_sft(data: DataElem[BaseMessage]) -> dict[str, Any]:
 
 
 @autocast
-def format_preference(data: DataElem[PreferenceMessage]) -> dict[str, Any]:
+def format_preference(data: Instance[PreferenceMessage]) -> dict[str, Any]:
     """format data for preference learning
     
     ref: https://huggingface.co/docs/trl/dpo_trainer#expected-dataset-type"""

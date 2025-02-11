@@ -1,10 +1,16 @@
 
 model_name: test_gpt2_sft
-base_trainer: SFTTrainer
-reader:
+trainer: 
+  name: SFTTrainer
+  num_train_epochs: 1
+  gradient_accumulation_steps: 4
+  per_device_train_batch_size: 8
+  logging_steps: 5
+
+data:
   sources:
     - name: test
-      source: rsc/data/sft/AiHub-Largeai_SFT_QA.jsonl
+      source: rsc/data/AiHub-Largeai_SFT_QA.jsonl
       limit: 500
       reader: read_simple
     - name: hub
@@ -14,29 +20,9 @@ reader:
       reader: read_prompt
       use_cache: true
 
-format: format_sft
+  formatter: format_sft
 
 model:
   path: Qwen/Qwen2-0.5B-Instruct
   device: cpu
 
-
-
-loss:
-  name: CrossEntropyLoss
-  ignore_index: -100
-
-optimizer:
-  name: adamw_hf
-  learning_rate: 5.0e-05
-  weight_decay: 0.01
-
-scheduler:
-  name: linear
-  warmup_ratio: 0.1
-
-training_arguments:
-  num_train_epochs: 1
-  gradient_accumulation_steps: 4
-  per_device_train_batch_size: 8
-  logging_steps: 5

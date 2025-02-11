@@ -3,36 +3,42 @@
 ## Introduction
 모든 과정을 config를 사용하여 관리하고, 외부 요인의 변화가 없을 시 reproduce 가능한 상태로 저장하는 것을 목표로 개발하였습니다.
 
+Core logic을 최대한 건드리지 않는 대신 custom function을 사용 가능하도록 만들고,
+custom function을 사용하여 개발 시 해당 파일의 tracking이 가능하도록 만들었습니다.
+
+-> 실제 스크립트를 실행할 당시의 코드를 항상 저장합니다.
+
 ## Requirements
 `python >= 3.10`
 
 * Deepspeed 사용시 `python==3.10`으로 세팅해야 합니다.
 
-# How to run
-`python run.py --mode [train | inference | evaluation] --run_config <config_path>`
+## How to run
+`python run.py --run_config <config_path>`
 
 `python run.py --help` 를 치면 사용 방법을 알 수 있습니다.
 
 ### Accelerate
-`python run.py --mode [train | inference | evaluation] --run_config <config_path> --accelerate_config <accelerate_config_path>`
+`python run.py --run_config <config_path> --accelerate_config <accelerate_config_path>`
 
 자동으로 accelerate launch를 수행합니다.
 
 ### multi-node (beta)
-`python run.py --mode [train | inference | evaluation] --run_config <config_path> --accelerate_config <accelerate_config_path> --nodes [nodelist]`
+`python run.py --run_config <config_path> --accelerate_config <accelerate_config_path> --nodes [nodelist]`
 
-slurm style node list를 전달 시 각각의 node에 ssh command를 수행하는 방식으로 multinode 학습을 진행합니다.
+slurm style node list를 전달 시 각각의 node에 ssh command를 수행하는 방식으로 multinode 학습을 진행합니다. 자동으로 accelerate config의 num_machines와 machine_rank를 수정합니다.
 
-이 때 반드시 accelerate config에 정의된 `num_machines`와 전달한 node 수가 같은지 확인해 주세요.
+slurm을 통해 스크립트를 실행할 경우에도 적용됩니다.
 
 
-## Deeper inside
-데이터 준비, 모델 준비, 학습/추론/평가 준비 -> 실행 의 과정으로 이루어져 있습니다.
+### Deepspeed
+미구현, 하지만 accelerate config에 deepspeed를 사용할 수 있습니다.
+
+## Config file
+
+데이터 준비, 모델 준비, 학습 준비 -> 실행 의 과정으로 이루어져 있습니다.
 
 각각의 과정은 모두 Config로 제어 가능합니다. Config class를 참고해서 작성해 주세요.
-
-TrainConfig, InferenceConfig, EvaluationConfig는 모두 다른 형식을 가지고 있습니다.
-이는 각각의 과정을 구분하여 실험 구분이 쉽도록 하기 위한 목적입니다.
 
 예시 config 파일은 [config/base](https://github.com/minolee/mlops/tree/main/config/base) 디렉토리에서 확인할 수 있습니다.
 

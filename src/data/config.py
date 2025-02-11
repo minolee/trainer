@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from src.base import BaseConfig, CallConfig, DataElem
-from src.base.base_message import PreferenceMessage
+from src.base import BaseConfig, CallConfig
 from src.utils import world_size, rank_zero_only
 from .reader import get_reader
 from .formatter import get_formatter
@@ -21,9 +20,11 @@ from datasets import (
 # from deprecated import deprecated
 T = TypeVar("T")
 
+__all__ = ["DataConfig", "DataElem"]
+
 class DataConfig(BaseConfig):
     """데이터를 읽어오는 방법을 정의하는 config class"""
-    sources: list[DataLoaderElem | str]
+    sources: list[DataElem | str]
     """데이터를 읽어오는 방법을 정의하는 ReaderElem들"""
 
     # lazy: bool = False # load only when needed
@@ -36,18 +37,29 @@ class DataConfig(BaseConfig):
     def __len__(self):
         return sum(len(source) for source in self.sources)
 
-    def __call__(self):
+    def __call__(self) -> DatasetDict | IterableDatasetDict:
         """setup all sources"""
         for source in self.sources:
             if isinstance(source, str):
-                source = DataLoaderElem(name=source)
+                source = DataElem(name=source)
             source.reader = source.reader or self.reader
             source.formatter = source.formatter or self.formatter
             source()
+        result = DatasetDict()
+        for source in self.sources:
+            if isinstance(source, DataElem):
+                for k, v in source.dataset.items():
+                    if k in result:
+                        result[k] = concatenate_datasets([result[k], v])
+                    else:
+                        result[k] = v
+        return result
+        
     
     def __getitem__(self, key: str) -> Dataset | IterableDataset | None:
         result = []
         for source in self.sources:
+            assert isinstance(source, DataElem)
             if key in source:
                 # result.extend([x.to_dict() for x in source[key]])
                 result.append(source[key])
@@ -64,16 +76,16 @@ class DataConfig(BaseConfig):
         print("###################")
         
         print("Number of sources:", len(self.sources))
-        for k in DataType.__members__.keys():
-            try:
-                if isinstance(d:=self[k.lower()], Dataset):
-                    print(f"{k} split: {len(d)}")
-            except:
-                pass
+        # for k in DataType.__members__.keys():
+        #     try:
+        #         if isinstance(d:=self[k.lower()], Dataset):
+        #             print(f"{k} split: {len(d)}")
+        #     except:
+        #         pass
         
         print(f"Number of data: {len(self)}")
 
-class DataLoaderElem(BaseConfig):
+class DataElem(BaseConfig):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     """개별 파일을 읽어오는 방법 정의. call하는 경우 config에 맞게 데이터를 읽은 뒤 split을 진행함."""
     name: str | None = None
@@ -103,6 +115,7 @@ class DataLoaderElem(BaseConfig):
         """Read and split data"""
         # read -> split
         assert self.reader is not None, f"reader_fn of {self.name or self.source} is not defined"
+        assert self.formatter is not None, f"formatter_fn of {self.name or self.source} is not defined"
         reader = get_reader(self.reader)
         formatter = get_formatter(self.formatter)
         if self.source is None:
@@ -137,7 +150,7 @@ class DataLoaderElem(BaseConfig):
                 dataset = IterableDatasetDict({dataset.split: dataset})
             if self.limit and self.limit > 0:
                 dataset = DatasetDict({k: dataset[k].select(range(self.limit // len(datasets))) for k in dataset.keys()})
-            dataset.map(reader).filter(lambda x: x is not None).map(formatter)
+            dataset = dataset.map(reader).filter(lambda x: x is not None).map(formatter)
             return dataset
         datasets = list(map(proc, datasets))
         

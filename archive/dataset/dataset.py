@@ -5,7 +5,7 @@ from torch.utils.data import Dataset as D
 from transformers import PreTrainedTokenizer
 from src.utils import create_get_fn
 from .prompt import PromptTemplate
-from src.base import BaseMessage, PreferenceMessage, DataElem
+from src.base import BaseMessage, PreferenceMessage, Instance
 from typing import Iterable
 __all__ = ["get_dataset", "BaseDataset"]
 
@@ -13,7 +13,7 @@ __all__ = ["get_dataset", "BaseDataset"]
 class BaseDataset(D):
     def __init__(
         self, 
-        data: Iterable[DataElem], 
+        data: Iterable[Instance], 
         split: str,
         prompt: PromptTemplate,
         tokenizer: PreTrainedTokenizer,
@@ -41,12 +41,12 @@ class BaseDataset(D):
     def __getitem__(self, idx):
         return self.tokenized[idx]
 
-    def process_elem(self, elem: DataElem) -> dict[str, torch.Tensor] | None:
+    def process_elem(self, elem: Instance) -> dict[str, torch.Tensor] | None:
         """
-        DataElem을 받아서 모델의 입력으로 가공하는 함수. subclass에서 이 함수를 구현하면 됨.
+        Instance을 받아서 모델의 입력으로 가공하는 함수. subclass에서 이 함수를 구현하면 됨.
 
         :param elem: training / inference 단위 data
-        :type elem: DataElem
+        :type elem: Instance
         :return: 모델의 입력으로 들어갈 tensor. key는 모델의 forward input key와 일치해야 함.
         :rtype: dict[str, torch.Tensor]
         """
@@ -68,7 +68,7 @@ class SFTDataset(BaseDataset):
     read from KT style jsonl file, no passage used
     used for sft model
     """
-    def process_elem(self, elem: DataElem) -> dict[str, torch.Tensor] | None:
+    def process_elem(self, elem: Instance) -> dict[str, torch.Tensor] | None:
         messages = elem.elem
         messages = self.merge_system_prompt(messages)
         # 학습 split별로 다른 처리 진행
@@ -98,7 +98,7 @@ class SFTDataset(BaseDataset):
 
 
 class InferenceDataset(BaseDataset):
-    def process_elem(self, elem: DataElem) -> dict[str, torch.Tensor]:
+    def process_elem(self, elem: Instance) -> dict[str, torch.Tensor]:
         messages = elem.elem
         messages = self.merge_system_prompt(messages)
         input_ids = []
@@ -122,7 +122,7 @@ class InferenceDataset(BaseDataset):
         }
 
 class PreferenceDataset(BaseDataset):
-    def process_elem(self, elem: DataElem) -> dict[str, torch.Tensor]:
+    def process_elem(self, elem: Instance) -> dict[str, torch.Tensor]:
         assert isinstance(elem.elem[-1], PreferenceMessage)
         input_ids = []
         attention_mask = []

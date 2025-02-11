@@ -1,11 +1,11 @@
 
-from src.base import BaseMessage, DataElem
+from src.base import BaseMessage, Instance
 from latex2sympy2_extended import NormalizationConfig
 from math_verify import LatexExtractionConfig, parse, verify
 
 def read_sol(data: dict) -> dict | None:
     
-    return DataElem(
+    return Instance(
         elem=[
             BaseMessage(speaker="user", message=data["problem"]),
             BaseMessage(speaker="assistant", message=data["solution"])
@@ -20,7 +20,7 @@ SYSTEM_PROMPT = (
 )
 
 
-def format_conversation(data: DataElem[BaseMessage]) -> dict | None:
+def format_conversation(data: Instance[BaseMessage]) -> dict | None:
     return {
         "prompt": [
             {"role": "system", "content": SYSTEM_PROMPT},
