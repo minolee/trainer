@@ -35,7 +35,7 @@ class SplitStrategy(Enum):
 
 class ReaderConfig(BaseConfig):
     """데이터를 읽어오는 방법을 정의하는 config class"""
-    sources: list[ReaderElem]
+    sources: list[ReaderElem | str]
     """데이터를 읽어오는 방법을 정의하는 ReaderElem들"""
 
     # lazy: bool = False # load only when needed
@@ -48,6 +48,8 @@ class ReaderConfig(BaseConfig):
     def __call__(self):
         """setup all sources"""
         for source in self.sources:
+            if isinstance(source, str):
+                source = ReaderElem(name=source)
             source.reader = source.reader or self.reader
             source()
     
@@ -85,8 +87,8 @@ class ReaderElem(BaseConfig):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     """개별 파일을 읽어오는 방법 정의. call하는 경우 config에 맞게 데이터를 읽은 뒤 split을 진행함."""
     name: str | None = None
-    """데이터셋 이름, optional"""
-    source: str
+    """데이터셋 이름 또는 hf dataset card"""
+    source: str | list[str] | None = None
     """데이터셋 경로"""
     split: str | None = None
     """데이터셋 분할 방법. https://huggingface.co/docs/datasets/v3.2.0/en/loading#slice-splits 참고"""
@@ -110,27 +112,41 @@ class ReaderElem(BaseConfig):
         # read -> split
         assert self.reader is not None, f"reader_fn of {self.name or self.source} is not defined"
         reader = get_reader(self.reader)
-        if os.path.exists(self.source):
-            dataset = load_dataset(
-                path="json",
-                name=self.name,
-                data_files=self.source,
-                split=self.split,
-                download_mode=DownloadMode.FORCE_REDOWNLOAD if not self.use_cache else DownloadMode.REUSE_CACHE_IF_EXISTS
-            )
-        else:
-            dataset = load_dataset(
-                path=self.source,
-                split=self.split,
-                download_mode=DownloadMode.FORCE_REDOWNLOAD if not self.use_cache else DownloadMode.REUSE_CACHE_IF_EXISTS
-            )
-        if isinstance(dataset, Dataset):
-            dataset = DatasetDict({"train": dataset})
-        elif isinstance(dataset, IterableDataset):
-            dataset = IterableDatasetDict({"train": dataset})
-        if self.limit and self.limit > 0:
-            dataset = DatasetDict({k: dataset[k].select(range(self.limit)) for k in dataset.keys()})
-        self.dataset = dataset.map(reader).filter(lambda x: x is not None)
+        if self.source is None:
+            assert self.name is not None
+            self.source = self.name
+        if isinstance(self.source, str):
+            self.source = [self.source]
+
+        datasets = []
+        for source in self.source:
+            if os.path.exists(source):
+                dataset = load_dataset(
+                    path="json",
+                    name=self.name,
+                    data_files=source,
+                    split=self.split,
+                    download_mode=DownloadMode.FORCE_REDOWNLOAD if not self.use_cache else DownloadMode.REUSE_CACHE_IF_EXISTS
+                )
+            else:
+                dataset = load_dataset(
+                    path=source,
+                    split=self.split,
+                    download_mode=DownloadMode.FORCE_REDOWNLOAD if not self.use_cache else DownloadMode.REUSE_CACHE_IF_EXISTS
+                )
+            datasets.append(dataset)
+        
+        def proc(dataset):
+            if isinstance(dataset, Dataset):
+                dataset = DatasetDict({"train": dataset})
+            elif isinstance(dataset, IterableDataset):
+                dataset = IterableDatasetDict({"train": dataset})
+            if self.limit and self.limit > 0:
+                dataset = DatasetDict({k: dataset[k].select(range(self.limit // len(datasets))) for k in dataset.keys()})
+            dataset.map(reader).filter(lambda x: x is not None)
+            return dataset
+        datasets = list(map(proc, datasets))
+        self.dataset = concatenate_datasets(datasets)
     
     def __len__(self):
         assert self.dataset, "Dataset not initialized"
