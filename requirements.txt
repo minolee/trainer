@@ -11,4 +11,8 @@ transformers
 accelerate
 trl
 
+# Open-R1
+latex2sympy2_extended
+math-verify
+
 deepspeed; platform_system == "Linux"

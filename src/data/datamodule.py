@@ -1,4 +1,4 @@
-"""데이터를 총괄하는 모듈 - 아마 안쓸듯?"""
+"""데이터를 총괄하는 모듈"""
 from src.base import CallConfig
 from .reader import ReaderConfig
 from .dataset import get_format_fn

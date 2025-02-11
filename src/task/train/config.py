@@ -3,7 +3,7 @@ from __future__ import annotations
 import accelerate
 from src.base import BaseConfig, CallConfig
 from src.data import DataModule
-from src.data.reader import ReaderConfig, PromptTemplate, get_prompt
+from src.data.reader import ReaderConfig
 from src.data.dataset import FormatConfig
 from src.data.dataloader import get_collate_fn, DataLoaderConfig
 from src.model import ModelConfig

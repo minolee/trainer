@@ -36,3 +36,12 @@ def read_preference(source: dict) -> dict | None:
     dl = DataElem(elem=messages)
     result = dl.model_dump()
     return result
+
+def read_prompt(source: dict) -> dict | None:
+    """ref: https://huggingface.co/datasets/trl-lib/tldr"""
+    return DataElem(
+        elem = [
+            BaseMessage(speaker="user", message=source["prompt"]),
+            BaseMessage(speaker="assistant", message=source["completion"])
+        ]
+    ).model_dump()

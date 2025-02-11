@@ -7,27 +7,19 @@ reader:
       source: rsc/data/sft/AiHub-Largeai_SFT_QA.jsonl
       limit: 500
       reader: read_simple
+    - name: hub
+      source: trl-lib/tldr
+      split: train
+      limit: 500
+      reader: read_prompt
+      use_cache: true
 
-
-
-dataset:
-  prompt: Llama31
-  dataset: 
-    name: SFTDataset
-    max_length: 1024
-
-dataloader:
-  shuffle: true
-  num_workers: 0 # num_workers > 0이면 메모리 더 나감
-  collate_fn: base_collate_fn
-
-
-tokenizer:
-  path: openai-community/gpt2
+format: format_sft
 
 model:
-  path: openai-community/gpt2
-  device: mps
+  path: Qwen/Qwen2-0.5B-Instruct
+  device: cpu
+
 
 
 loss:

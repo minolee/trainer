@@ -7,6 +7,7 @@ from .reader import get_reader
 from enum import Enum
 from typing import Iterable, TypeVar, Literal
 from pydantic import ConfigDict, Field
+import os
 from datasets import (
     load_dataset, 
     DatasetDict, 
@@ -109,15 +110,20 @@ class ReaderElem(BaseConfig):
         # read -> split
         assert self.reader is not None, f"reader_fn of {self.name or self.source} is not defined"
         reader = get_reader(self.reader)
-        
-        dataset = load_dataset(
-            path="json",
-            name=self.name,
-            data_files=self.source,
-            split=self.split,
-            download_mode=DownloadMode.FORCE_REDOWNLOAD if not self.use_cache else DownloadMode.REUSE_CACHE_IF_EXISTS
-        )
-
+        if os.path.exists(self.source):
+            dataset = load_dataset(
+                path="json",
+                name=self.name,
+                data_files=self.source,
+                split=self.split,
+                download_mode=DownloadMode.FORCE_REDOWNLOAD if not self.use_cache else DownloadMode.REUSE_CACHE_IF_EXISTS
+            )
+        else:
+            dataset = load_dataset(
+                path=self.source,
+                split=self.split,
+                download_mode=DownloadMode.FORCE_REDOWNLOAD if not self.use_cache else DownloadMode.REUSE_CACHE_IF_EXISTS
+            )
         if isinstance(dataset, Dataset):
             dataset = DatasetDict({"train": dataset})
         elif isinstance(dataset, IterableDataset):

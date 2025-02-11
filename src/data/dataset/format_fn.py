@@ -10,22 +10,24 @@ from typing import Any
 
 __all__ = ["get_format_fn"]
 
-def format_fn(data: DataElem, prompt: PromptTemplate) -> dict[str, Any]:
+def format_fn(data: DataElem) -> dict[str, Any]:
     """format data for model training"""
     ...
 
 @autocast
-def format_sft(data: DataElem, prompt: PromptTemplate) -> dict[str, str]:
+def format_sft(data: DataElem[BaseMessage]) -> dict[str, Any]:
+    """ref: https://huggingface.co/docs/trl/sft_trainer#dataset-format-support"""
     result = {
-        "messages": []
+        "messages": [{"role": msg.speaker, "content": msg.message} for msg in data.elem]
     }
-
     return result
 
 
 @autocast
-def format_preference(data: DataElem[PreferenceMessage]) -> dict[str, str]:
-    """format data for preference learning"""
+def format_preference(data: DataElem[PreferenceMessage]) -> dict[str, Any]:
+    """format data for preference learning
+    
+    ref: https://huggingface.co/docs/trl/dpo_trainer#expected-dataset-type"""
     result = {}
     # p = []
     # for message in data.elem[:-1]:
