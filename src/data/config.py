@@ -4,6 +4,7 @@ from src.base import BaseConfig, CallConfig, DataElem
 from src.base.base_message import PreferenceMessage
 from src.utils import world_size, rank_zero_only
 from .reader import get_reader
+from .formatter import get_formatter
 from enum import Enum
 from typing import Iterable, TypeVar, Literal
 from pydantic import ConfigDict, Field
@@ -20,27 +21,17 @@ from datasets import (
 # from deprecated import deprecated
 T = TypeVar("T")
 
-class DataType(Enum):
-    TRAIN = "train"
-    DEV = "dev"
-    VALIDATION = "validation"
-    TEST = "test"
-    PREDICT = "predict"
-    MIXED = "mixed"
-
-class SplitStrategy(Enum):
-    CYCLE = "cycle"
-    SIZE = "size"
-    RANDOM = "random"
-
-class ReaderConfig(BaseConfig):
+class DataConfig(BaseConfig):
     """데이터를 읽어오는 방법을 정의하는 config class"""
-    sources: list[ReaderElem | str]
+    sources: list[DataLoaderElem | str]
     """데이터를 읽어오는 방법을 정의하는 ReaderElem들"""
 
     # lazy: bool = False # load only when needed
     reader: str | CallConfig | None = None 
-    """ReaderElem에 reader_fn이 없을 때 사용할 reader_fn"""
+    """Default reader function. ReaderElem에 reader를 정의하지 않을 경우 이 reader를 사용함"""
+
+    formatter: str | CallConfig | None = None
+    """Default formatter function. ReaderElem에 foramtter를 정의하지 않을 경우 이 formatter를 사용함"""
 
     def __len__(self):
         return sum(len(source) for source in self.sources)
@@ -49,8 +40,9 @@ class ReaderConfig(BaseConfig):
         """setup all sources"""
         for source in self.sources:
             if isinstance(source, str):
-                source = ReaderElem(name=source)
+                source = DataLoaderElem(name=source)
             source.reader = source.reader or self.reader
+            source.formatter = source.formatter or self.formatter
             source()
     
     def __getitem__(self, key: str) -> Dataset | IterableDataset | None:
@@ -81,8 +73,7 @@ class ReaderConfig(BaseConfig):
         
         print(f"Number of data: {len(self)}")
 
-
-class ReaderElem(BaseConfig):
+class DataLoaderElem(BaseConfig):
     
     model_config = ConfigDict(arbitrary_types_allowed=True)
     """개별 파일을 읽어오는 방법 정의. call하는 경우 config에 맞게 데이터를 읽은 뒤 split을 진행함."""
@@ -98,11 +89,13 @@ class ReaderElem(BaseConfig):
     reader: str | CallConfig | None = None
     """Raw data를 Message 형태로 변환하는 함수"""
 
-    # feature: str | None = None
+    formatter: str | CallConfig | None = None
+    """Message를 Trainer에 적합한 형태로 변환하는 함수"""
+
     use_cache: bool = False
-    # __load_buf: list[DataElem] = Field(default_factory=list, exclude=True)
+    """Cache 사용 여부"""
+
     dataset: DatasetDict | IterableDatasetDict | None = Field(default=None, exclude=True)
-    # split_buf: dict[str, list[DataElem]] = Field(default_factory=dict, exclude=True)
     """loaded data"""
 
     def __call__(
@@ -112,6 +105,7 @@ class ReaderElem(BaseConfig):
         # read -> split
         assert self.reader is not None, f"reader_fn of {self.name or self.source} is not defined"
         reader = get_reader(self.reader)
+        formatter = get_formatter(self.formatter)
         if self.source is None:
             assert self.name is not None
             self.source = self.name
@@ -144,7 +138,7 @@ class ReaderElem(BaseConfig):
                 dataset = IterableDatasetDict({dataset.split: dataset})
             if self.limit and self.limit > 0:
                 dataset = DatasetDict({k: dataset[k].select(range(self.limit // len(datasets))) for k in dataset.keys()})
-            dataset.map(reader).filter(lambda x: x is not None)
+            dataset.map(reader).filter(lambda x: x is not None).map(formatter)
             return dataset
         datasets = list(map(proc, datasets))
         
@@ -176,60 +170,3 @@ class ReaderElem(BaseConfig):
         if all(len(x) != len(self) for x in self.dataset.values()):
             print("Splitted length", {k: len(v) for k, v in self.dataset.items()})
         print(f"Reader: {self.reader.name if isinstance(self.reader, CallConfig) else self.reader}")
-
-# @deprecated
-class SplitConfig(BaseConfig):
-    """데이터셋을 분할하는 방법 정의"""
-    type: DataType = DataType.MIXED
-    strategy: str | None = "cycle"
-    split_ratio: str | list[float | int] | None = None
-    
-
-    def parse_split_ratio(self) -> list[int]:
-        """
-        parse split ratio into list of int
-        "8:1:1" -> [8, 1, 1]
-        "1:0:0" -> [1, 0, 0]
-        "0.8:0.1:0.1" -> [8, 1, 1]
-        
-        """
-        match self.type:
-            case DataType.TRAIN.value:
-                return [1, 0, 0]
-            case DataType.DEV.value | DataType.VALIDATION.value:
-                return [0, 1, 0]
-            case DataType.TEST.value | DataType.PREDICT.value:
-                return [0, 0, 1]
-            case DataType.MIXED.value:
-                assert self.split_ratio is not None, "split_ratio is not defined"
-                split_ratio = self.split_ratio
-                if isinstance(split_ratio, str):
-                    split_ratio = [float(x) for x in split_ratio.split(":")]
-                    split_ratio = split_ratio[:3] + [0] * (3 - len(split_ratio))
-                mval = min(x for x in split_ratio if x > 0)
-                split_ratio = [int(x / mval) for x in split_ratio]
-                return split_ratio
-        raise NotImplementedError(f"split type {self.type} is not implemented")
-
-    def __call__(self, data: Iterable[T]) -> list[list[T]]:
-        """
-        split data into train / dev / test
-        """
-        split_data: list[list[T]] = [[] for _ in range(3)]
-        c = 0
-        idx = 0
-        it = iter(data)
-        split_ratio = self.parse_split_ratio()
-        while True:
-            try:
-                if c >= split_ratio[idx]:
-                    c = 0
-                    idx += 1
-                    idx %= 3
-                    continue
-                line = next(it)
-                split_data[idx].append(line)
-                c += 1
-            except StopIteration:
-                break
-        return split_data

@@ -2,7 +2,6 @@ from __future__ import annotations
 from src.base import BaseConfig, CallConfig
 from src.data import DataModule
 from src.data.reader import ReaderConfig
-from src.data.dataset import FormatConfig
 from src.data.dataloader import get_collate_fn, DataLoaderConfig
 from src.model import ModelConfig
 from src.tokenizer import TokenizerConfig
@@ -68,18 +67,10 @@ def create_trainer(config: TrainConfig):
 
     if config.reward_model:
         kwargs["reward_model"] = config.reward_model()
-    if config.dataloader is not None and config.dataloader.collate_fn:
-        kwargs["data_collator"] = get_collate_fn(config.dataloader.collate_fn)
     
     # load data
-    datamodule = DataModule(
-        config.reader,
-        config.format,
-        config.tokenizer
-    )
+    datamodule = config.dataloader()
 
-    datamodule.prepare_data(["train", "dev"])
-    datamodule.info()
     kwargs["train_dataset"] = datamodule["train"]
     kwargs["eval_dataset"] = datamodule["dev"]
     
@@ -110,8 +101,6 @@ class TrainConfig(BaseConfig):
     """모델이 저장될 이름, 학습 결과는 이 path에 저장됨"""
     base_trainer: str | CallConfig = "Trainer"
     
-    reader: ReaderConfig
-    format: str | CallConfig
     dataloader: DataLoaderConfig | None = None
     tokenizer: TokenizerConfig | None = None
     

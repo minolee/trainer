@@ -8,9 +8,9 @@ from src.utils import autocast, create_get_fn
 from .prompt import PromptTemplate
 from typing import Any
 
-__all__ = ["get_format_fn"]
+__all__ = ["get_formatter"]
 
-def format_fn(data: DataElem) -> dict[str, Any]:
+def formatter(data: DataElem) -> dict[str, Any]:
     """format data for model training"""
     ...
 
@@ -42,4 +42,4 @@ def format_preference(data: DataElem[PreferenceMessage]) -> dict[str, Any]:
     return result
 
 
-get_format_fn = create_get_fn(__name__, type_hint=format_fn) # type: ignore
+get_formatter = create_get_fn(__name__, type_hint=formatter) # type: ignore

@@ -1,4 +1,6 @@
-"""prompt for various tasks"""
+"""(제거 예정) tokenizer의 ChatTemplate를 사용할 것
+
+prompt for various tasks"""
 from __future__ import annotations
 from pydantic import BaseModel, ConfigDict
 from src.base import BaseMessage
