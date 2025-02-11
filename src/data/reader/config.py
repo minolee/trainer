@@ -134,19 +134,27 @@ class ReaderElem(BaseConfig):
                     split=self.split,
                     download_mode=DownloadMode.FORCE_REDOWNLOAD if not self.use_cache else DownloadMode.REUSE_CACHE_IF_EXISTS
                 )
+            
             datasets.append(dataset)
         
         def proc(dataset):
             if isinstance(dataset, Dataset):
-                dataset = DatasetDict({"train": dataset})
+                dataset = DatasetDict({dataset.split: dataset})
             elif isinstance(dataset, IterableDataset):
-                dataset = IterableDatasetDict({"train": dataset})
+                dataset = IterableDatasetDict({dataset.split: dataset})
             if self.limit and self.limit > 0:
                 dataset = DatasetDict({k: dataset[k].select(range(self.limit // len(datasets))) for k in dataset.keys()})
             dataset.map(reader).filter(lambda x: x is not None)
             return dataset
         datasets = list(map(proc, datasets))
-        self.dataset = concatenate_datasets(datasets)
+        
+        self.dataset = DatasetDict()
+        for dataset in datasets:
+            for k, v in dataset.items():
+                if k in self.dataset:
+                    self.dataset[k] = concatenate_datasets([self.dataset[k], v])
+                else:
+                    self.dataset[k] = v
     
     def __len__(self):
         assert self.dataset, "Dataset not initialized"

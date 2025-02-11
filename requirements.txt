@@ -10,6 +10,7 @@ tokenizers
 transformers
 accelerate
 trl
+peft
 
 # Open-R1
 latex2sympy2_extended

@@ -13,16 +13,19 @@ class ModelConfig(BaseConfig):
     """if false, will load model without weights"""
     device: str = "cuda" # device to use
 
-    load_kwargs: BaseConfig = BaseConfig()
-
     def __call__(self) -> PreTrainedModel:
         """load model from config"""
+
+        kwargs = self.model_dump()
+        for key in ["path", "model_type", "load_weight", "device"]:
+            kwargs.pop(key, None)
+
         if not self.load_weight:
             model = AutoModelForCausalLM.from_config(
                 AutoConfig.from_pretrained(self.path)
             ) # does not load weights
         else:
-            model = AutoModelForCausalLM.from_pretrained(self.path, **self.load_kwargs.model_dump())
+            model = AutoModelForCausalLM.from_pretrained(self.path, **kwargs)
         
         model.to(self.device) # type: ignore
         self.model_type = getattr(model.config, "model_type", "unknown")

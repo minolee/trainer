@@ -8,7 +8,7 @@ import sys
 import random
 import string
 from ..trainer import TrainConfig
-from ..utils import parse_nodelist, is_localhost, read_magic, write_magic, concat
+from ..utils import parse_nodelist, is_localhost, read_magic, write_magic, concat, load_module
 __all__ = ["LauncherConfig"]
 
 class LauncherConfig(BaseConfig):
@@ -55,14 +55,20 @@ class LauncherConfig(BaseConfig):
         else:
             nodes = ["localhost"]
         if is_slurm:
+            print("Running script with SLURM")
             nodes = parse_nodelist(os.environ["SLURM_JOB_NODELIST"])
-        
+            print("# of nodes:", len(nodes))
         if is_main:
             output_dir = config.save_dir
             os.makedirs(output_dir, exist_ok=True)
             launch_config = self.model_dump()
             launch_config["run_config"] = f"{output_dir}/run_config.yaml"
             shutil.copy(self.run_config, f"{output_dir}/run_config.yaml")
+            # copy custom files
+            for f in os.listdir(sdir:=os.path.dirname(self.run_config)):
+                if f.endswith(".py"):
+                    shutil.copy(os.path.join(sdir, f), output_dir)
+            
             if self.accelerate_config:
                 accelerate_config = read_magic(self.accelerate_config)
                 accelerate_config["num_machines"] = len(nodes)
@@ -75,18 +81,15 @@ class LauncherConfig(BaseConfig):
                 launch_config["deepspeed_config"] = f"{output_dir}/deepspeed_config.yaml"
             write_magic(f"{output_dir}/launch_config.yaml", launch_config)
         
-        
-        
         if len(nodes) > 1 or not is_localhost(nodes[0]) and not is_slurm:
-            # 각각의 node마다 수행할 accelerate config를 복사하여 저장
+            # ssh on each node
             procs = []
             host = nodes[0]
             pwd = os.getcwd()
             proc_port = random.randint(10000, 20000)
             for i, n in enumerate(nodes):
+                # 각각의 node마다 ssh로 command 실행
                 if self.accelerate_config:
-                    acc = read_magic(self.accelerate_config)
-                    assert len(nodes) == acc.get("num_machines", 1), "Number of nodes should be equal to num_machines"
                     procs.append(subprocess.Popen(
                         ["ssh", n] 
                         + ["cd", pwd, "&&"]
@@ -104,6 +107,8 @@ class LauncherConfig(BaseConfig):
             for proc in procs:
                 proc.wait()
             return
+        
+        
         if any([self.accelerate_config, self.deepspeed_config]) and is_main:
             # run subprocess
             run = []
@@ -121,5 +126,8 @@ class LauncherConfig(BaseConfig):
                 proc.wait()
             return
         
-        # run part
+        # run main
+
+        load_module(output_dir)
+
         config()

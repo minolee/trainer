@@ -115,7 +115,7 @@ class TrainConfig(BaseConfig):
     dataloader: DataLoaderConfig | None = None
     tokenizer: TokenizerConfig | None = None
     
-    model: ModelConfig
+    model: ModelConfig | str
     """학습을 진행할 메인 모델"""
 
     ref_model: ModelConfig | None = None
@@ -136,6 +136,8 @@ class TrainConfig(BaseConfig):
         """Config를 사용하여 모델을 학습합니다."""
         save_dir = self.save_dir
         os.makedirs(save_dir, exist_ok=True)
+        if isinstance(self.model, str):
+            self.model = ModelConfig(path=self.model)
         if self.tokenizer is None:
             self.tokenizer = TokenizerConfig(path=self.model.path)
         trainer = create_trainer(self)

@@ -3,12 +3,10 @@
 import importlib.util
 import os
 import sys
-
-from .func_util import create_get_fn
-
+from types import ModuleType
 __all__ = ["custom_modules", "load_module"]
 
-custom_modules = {}
+custom_modules: dict[str, ModuleType] = {}
 
 
 def import_module_from_path(module_name, file_path):
@@ -19,12 +17,12 @@ def import_module_from_path(module_name, file_path):
     module = importlib.util.module_from_spec(spec)
     
     # 필요하다면, sys.modules에 등록하여 다른 곳에서 import할 수 있도록 합니다.
-    sys.modules[module_name] = module
+    custom_modules[module_name] = module
     
     # 모듈의 코드를 실행하여 초기화합니다.
     spec.loader.exec_module(module)
     
-    return module
+    # return module
 
 def load_module(d: str):
     """
@@ -36,7 +34,4 @@ def load_module(d: str):
     for fname in os.listdir(d):
         if fname.endswith(".py"):
             # abs_path = os.path.abspath(os.path.join(d, fname))
-            module = import_module_from_path(f"custom.{fname[:-3]}", os.path.join(d, fname))
-
-
-get_custom_fn = create_get_fn()
+            import_module_from_path(fname[:-3], os.path.join(d, fname))
