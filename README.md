@@ -40,7 +40,7 @@ slurm을 통해 스크립트를 실행할 경우에도 적용됩니다.
 
 각각의 과정은 모두 Config로 제어 가능합니다. Config class를 참고해서 작성해 주세요.
 
-예시 config 파일은 [config/base](https://github.com/minolee/trainer/tree/main/config/base) 디렉토리에서 확인할 수 있습니다.
+예시 config 파일은 [config/train/base](https://github.com/minolee/trainer/tree/main/config/train/base) 디렉토리에서 확인할 수 있습니다.
 
 ### Data 준비
 
