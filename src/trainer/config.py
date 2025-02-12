@@ -6,7 +6,6 @@ from src.tokenizer import TokenizerConfig
 from src.env import MODEL_SAVE_DIR
 from src.utils import world_size, is_rank_zero, rank, drop_unused_args, create_get_fn
 
-from .trainer import get_trainer
 from pydantic import Field
 
 import torch

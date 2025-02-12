@@ -34,57 +34,80 @@ slurm을 통해 스크립트를 실행할 경우에도 적용됩니다.
 ### Deepspeed
 미구현, 하지만 accelerate config에 deepspeed를 사용할 수 있습니다.
 
-## Config file
+## (필독) Config 작성 방법
 
-데이터 준비, 모델 준비, 학습 준비 -> 실행 의 과정으로 이루어져 있습니다.
+데이터 준비, 모델 준비, trainer 준비 -> 실행 의 과정으로 이루어져 있습니다.
 
 각각의 과정은 모두 Config로 제어 가능합니다. Config class를 참고해서 작성해 주세요.
 
 예시 config 파일은 [config/base](https://github.com/minolee/trainer/tree/main/config/base) 디렉토리에서 확인할 수 있습니다.
 
-## Feature
-* Auto launch - accelerate를 자동으로 수행, slurm 또는 multi-node의 자동 실행
-* Reproduce 가능한 launch
-* Customizable functions
+### Data 준비
 
-## Data 준비
+config yaml 파일에 `data` 부분에 정의합니다.
 
-TRL의 각 trainer에는 지원하는 형식이 있습니다.
+TRL의 각 trainer마다 지원하는 형식이 있습니다.
 
 여기서는 Raw data를 각각의 형식으로 가공하기 위해 아래 과정을 따릅니다.
-Raw data -> list of BaseMessage -> TRL-supported dataset
+Raw data -> list of BaseMessage -> TRL-supported format
 
-BaseMessage는 speaker와 message로 이루어져 있습니다. 이는 TRL에서 사용하는 chat template과 유사하면서도, 사내에서 구축한 format을 사용하기 편하도록 만들기 위함입니다.
+[BaseMessage](https://github.com/minolee/trainer/tree/main/src/base/base_message.py)는 speaker와 message로 이루어져 있습니다. 이는 TRL에서 사용하는 chat template과 유사하면서도, 사내에서 구축한 format을 사용하기 편하도록 만들기 위함입니다.
 
-### Config 작성 방법
-config yaml 파일에 `dataloader` 부분에 정의합니다.
+필수 정의
+* source: raw data path
+* reader: raw data를 Instance(list of BaseMessage)로 변환하는 함수를 정의합니다.
+* formatter: Instance(list of BaseMessage)를 trl trainer에서 지원하는 형식으로 변환하는 함수를 정의합니다.
 
-config에 필요한 key, value type은 [DataLoaderConfig](https://github.com/minolee/trainer/tree/main/data/config.py)에 정의되어 있습니다.
+함수 이름을 제공하면 자동으로 찾아서 등록합니다.
+
+이외 config에 필요한 key, value type은 [DataConfig](https://github.com/minolee/trainer/tree/main/src/data/config.py)에 정의되어 있습니다.
 
 ```yaml
-dataloader:
+data:
   sources:
     - source: rsc/data/preference/processed/dpo_1cycle_241016.jsonl # 로컬 파일에서 읽어옵니다
       split: train # 이 파일을 train split으로 정의합니다
       limit: 500 # 이 파일에서 맨 앞 500개만 사용합니다.
       reader: read_preference # read_preference 함수를 사용하여 json instance를 BaseMessage 형태로 가공합니다.
     - source: AI-MO/NuminaMath-TIR # hf data hub에서 불러옵니다.
-      use_cache: true # cache화합니다.
+      use_cache: true # cache화합니다. (default false)
       reader: reader.read_sol # custom file reader.py의 read_sol 함수를 사용하여 data instance를 BaseMessage 형태로 가공합니다.
 ```
 
 config file과 같은 디렉토리에 있는 파이썬 파일에 있는 함수를 사용할 수 있습니다.
 
-## 모델 준비
-모델은 3가지 로딩 방식이 있습니다.
+### 모델 준비
 
-* load from hub
-* load from local
-* load from scratch
+config yaml 파일의 `model` 부분에 정의합니다.
 
-## Develop
+```yaml
+model:
+  path: Qwen/Qwen2-0.5B-Instruct # local path or hf model card
+```
 
-Task나 필요에 따라 추가적인 class를 정의해야 할 수 있습니다. 이 경우 참고해 주세요.
+### Trainer 준비
+
+config yaml 파일의 `trainer` 부분에 정의합니다.
+
+```yaml
+trainer: 
+  name: SFTTrainer # trl에 정의된 trainer 이름. 또는 custom trainer를 정의할 수 있습니다.
+  # 이 아래 부분은 Trainer의 argument로 들어갑니다.
+  num_train_epochs: 1
+  gradient_accumulation_steps: 4
+  per_device_train_batch_size: 8
+  logging_steps: 5
+```
+
+### Custom code integration
+
+필요한 class가 없는 경우나 특수한 로직이 필요한 경우, custom code를 작성하여 이를 사용할 수 있습니다.
+
+config yaml 파일과 같은 디렉토리에 파이썬 파일을 작성하면, 자동으로 해당 파이썬 파일을 가져와서 함수 이름을 불러옵니다.
+
+custom 함수를 사용하기 위해서는 <파일명>.<함수명> 으로 불러오면 됩니다.
+[open-r1 example](https://github.com/minolee/trainer/tree/main/config/train/custom/open_r1) 안의 예시 파일들을 확인해 주세요.
+
 
 ### Document
 https://minolee.github.io/trainer/
