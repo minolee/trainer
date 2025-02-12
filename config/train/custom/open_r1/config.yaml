@@ -1,24 +1,8 @@
 
 
 model_name: midm_r1_zero
-base_trainer: GRPOTrainer
-
-reader:
-  sources:
-    - source: AI-MO/NuminaMath-TIR
-      use_cache: true
-      reader: reader.read_sol
-
-format: reader.format_conversation
-
-model: 
-  path: Qwen/Qwen2.5-1.5B-Instruct
-  torch_dtype: bfloat16
-  attn_implementation: flash_attention_2
-
-
-# GRPO trainer config
-training_arguments:
+trainer: 
+  name: GRPOTrainer
   bf16: true
   use_vllm: false
   vllm_device: auto
@@ -48,3 +32,16 @@ training_arguments:
   save_strategy: "no"
   seed: 42
   warmup_ratio: 0.1
+
+data:
+  sources:
+    - source: AI-MO/NuminaMath-TIR
+      use_cache: true
+      reader: reader.read_sol
+
+format: reader.format_conversation
+
+model: 
+  path: Qwen/Qwen2.5-1.5B-Instruct
+  torch_dtype: bfloat16
+  attn_implementation: flash_attention_2

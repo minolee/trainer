@@ -4,6 +4,7 @@ from src.base import BaseConfig, CallConfig
 from src.utils import world_size, rank_zero_only
 from .reader import get_reader
 from .formatter import get_formatter
+from .filter import get_filter
 from enum import Enum
 from typing import Iterable, TypeVar, Literal
 from pydantic import ConfigDict, Field
@@ -30,7 +31,8 @@ class DataConfig(BaseConfig):
     # lazy: bool = False # load only when needed
     reader: str | CallConfig | None = None 
     """Default reader function. ReaderElem에 reader를 정의하지 않을 경우 이 reader를 사용함"""
-
+    filter: list[str | CallConfig] | None = None
+    """Filter function (optional)"""
     formatter: str | CallConfig | None = None
     """Default formatter function. ReaderElem에 foramtter를 정의하지 않을 경우 이 formatter를 사용함"""
 
@@ -43,6 +45,7 @@ class DataConfig(BaseConfig):
             if isinstance(source, str):
                 source = DataElem(name=source)
             source.reader = source.reader or self.reader
+            source.filter = source.filter or self.filter
             source.formatter = source.formatter or self.formatter
             source()
         result = DatasetDict()
@@ -100,6 +103,9 @@ class DataElem(BaseConfig):
     reader: str | CallConfig | None = None
     """Raw data를 Message 형태로 변환하는 함수"""
 
+    filter: list[str | CallConfig] | None = None
+    """Instance를 기반으로 필터링 진행"""
+
     formatter: str | CallConfig | None = None
     """Message를 Trainer에 적합한 형태로 변환하는 함수"""
 
@@ -118,6 +124,9 @@ class DataElem(BaseConfig):
         assert self.formatter is not None, f"formatter_fn of {self.name or self.source} is not defined"
         reader = get_reader(self.reader)
         formatter = get_formatter(self.formatter)
+        if self.filter is not None:
+            filter_fn = [get_filter(x) for x in self.filter]
+        
         if self.source is None:
             assert self.name is not None
             self.source = self.name
@@ -150,7 +159,10 @@ class DataElem(BaseConfig):
                 dataset = IterableDatasetDict({dataset.split: dataset})
             if self.limit and self.limit > 0:
                 dataset = DatasetDict({k: dataset[k].select(range(self.limit // len(datasets))) for k in dataset.keys()})
-            dataset = dataset.map(reader).filter(lambda x: x is not None).map(formatter)
+            dataset = dataset.map(reader).filter(lambda x: x is not None)
+            for filter in filter_fn:
+                dataset = dataset.filter(filter)
+            dataset = dataset.map(formatter)
             return dataset
         datasets = list(map(proc, datasets))
         
