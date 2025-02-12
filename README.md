@@ -1,4 +1,4 @@
-# MLOps Project
+# Trainer Project
 
 ## Introduction
 모든 과정을 config를 사용하여 관리하고, 외부 요인의 변화가 없을 시 reproduce 가능한 상태로 저장하는 것을 목표로 개발하였습니다.
@@ -40,7 +40,7 @@ slurm을 통해 스크립트를 실행할 경우에도 적용됩니다.
 
 각각의 과정은 모두 Config로 제어 가능합니다. Config class를 참고해서 작성해 주세요.
 
-예시 config 파일은 [config/base](https://github.com/minolee/mlops/tree/main/config/base) 디렉토리에서 확인할 수 있습니다.
+예시 config 파일은 [config/base](https://github.com/minolee/trainer/tree/main/config/base) 디렉토리에서 확인할 수 있습니다.
 
 ## Feature
 * Auto launch - accelerate를 자동으로 수행, slurm 또는 multi-node의 자동 실행
@@ -59,7 +59,7 @@ BaseMessage는 speaker와 message로 이루어져 있습니다. 이는 TRL에서
 ### Config 작성 방법
 config yaml 파일에 `dataloader` 부분에 정의합니다.
 
-config에 필요한 key, value type은 [DataLoaderConfig](https://github.com/minolee/mlops/tree/main/data/config.py)에 정의되어 있습니다.
+config에 필요한 key, value type은 [DataLoaderConfig](https://github.com/minolee/trainer/tree/main/data/config.py)에 정의되어 있습니다.
 
 ```yaml
 dataloader:
@@ -87,7 +87,7 @@ config file과 같은 디렉토리에 있는 파이썬 파일에 있는 함수�
 Task나 필요에 따라 추가적인 class를 정의해야 할 수 있습니다. 이 경우 참고해 주세요.
 
 ### Document
-https://minolee.github.io/mlops/
+https://minolee.github.io/trainer/
 
 ### Code Concept
 목적이 있는 모든 config는 callable입니다. config를 로드한 뒤 call하면 목적에 맞는 object를 반환하거나(예시: DatasetConfig), 프로세스를 실행합니다(예시: TrainConfig).
