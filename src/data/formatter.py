@@ -3,29 +3,30 @@
 https://github.com/huggingface/trl/blob/main/trl/extras/dataset_formatting.py#L78 의 입력 부분으로 가공하는 것임
 
 """
-from src.base import DataElem, BaseMessage, PreferenceMessage
+from src.base import Instance, BaseMessage, PreferenceMessage
 from src.utils import autocast, create_get_fn
-from .prompt import PromptTemplate
 from typing import Any
 
-__all__ = ["get_format_fn"]
+__all__ = ["get_formatter"]
 
-def format_fn(data: DataElem, prompt: PromptTemplate) -> dict[str, Any]:
+def formatter(data: Instance) -> dict[str, Any]:
     """format data for model training"""
     ...
 
 @autocast
-def format_sft(data: DataElem, prompt: PromptTemplate) -> dict[str, str]:
+def format_sft(data: Instance[BaseMessage]) -> dict[str, Any]:
+    """ref: https://huggingface.co/docs/trl/sft_trainer#dataset-format-support"""
     result = {
-        "messages": []
+        "messages": [{"role": msg.speaker, "content": msg.message} for msg in data.elem]
     }
-
     return result
 
 
 @autocast
-def format_preference(data: DataElem[PreferenceMessage]) -> dict[str, str]:
-    """format data for preference learning"""
+def format_preference(data: Instance[PreferenceMessage]) -> dict[str, Any]:
+    """format data for preference learning
+    
+    ref: https://huggingface.co/docs/trl/dpo_trainer#expected-dataset-type"""
     result = {}
     # p = []
     # for message in data.elem[:-1]:
@@ -40,4 +41,4 @@ def format_preference(data: DataElem[PreferenceMessage]) -> dict[str, str]:
     return result
 
 
-get_format_fn = create_get_fn(__name__, type_hint=format_fn) # type: ignore
+get_formatter = create_get_fn(__name__, type_hint=formatter) # type: ignore

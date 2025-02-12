@@ -6,6 +6,7 @@ from functools import wraps, partial
 from typing import TypeVar, Callable, Mapping
 from types import ModuleType
 from ..base.base_config import CallConfig
+from .custom import custom_modules
 import sys
 __all__ = [
     'create_register_deco', 'create_get_fn', 'drop_unused_args', 'autocast'
@@ -50,6 +51,21 @@ def create_get_fn(*name: str | ModuleType, type_hint: T | None = None) -> Callab
     """
 
     registry = [sys.modules[x] if isinstance(x, str) else x for x in name]
+    registry.append(custom_modules)
+    def iter_name_get(name: str, reg: dict | ModuleType):
+        if isinstance(reg, dict):
+            name_getter = lambda name, reg: reg[name] # type: ignore
+        elif isinstance(reg, ModuleType):
+            name_getter = lambda name, reg: getattr(reg, name) # 여기서는 lower()를 사용하지 않음
+        else:
+            raise ValueError("registry should be dict or module")
+        path = name.split(".")
+        if len(path) == 1:
+            return name_getter(name, reg)
+        else:
+            return iter_name_get(".".join(path[1:]), name_getter(path[0], reg))
+
+    
     def get_fn(name: str | CallConfig) -> T | partial[T]:
         """
         이름 또는 CallConfig를 사용하여 함수나 class를 불러옴
@@ -61,20 +77,15 @@ def create_get_fn(*name: str | ModuleType, type_hint: T | None = None) -> Callab
         :rtype: T | partial[T]
         """
         fn_target = name if isinstance(name, str) else name.name
+
         for reg in registry:
-            if isinstance(reg, dict):
-                name_getter = lambda name: reg[name] # type: ignore
-            elif isinstance(reg, ModuleType):
-                name_getter = lambda name: getattr(reg, name) # 여기서는 lower()를 사용하지 않음
-            else:
-                raise ValueError("registry should be dict or module")
             try:
                 if isinstance(name, str):
-                    return name_getter(name)
+                    return iter_name_get(name, reg)
                 elif isinstance(name, CallConfig):
                     kwargs = name.model_dump()
                     kwargs.pop("name")
-                    return partial(name_getter(name.name), **kwargs)
+                    return partial(iter_name_get(name.name, reg), **kwargs)
             except:
                 pass
         raise ValueError(f"Name {fn_target} not found on every registry")

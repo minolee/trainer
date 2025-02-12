@@ -35,3 +35,8 @@ class CallConfig(BaseConfig):
 
     def __repr__(self):
         return self.name
+
+    def get_kwargs(self):
+        kwargs = self.model_dump()
+        kwargs.pop("name")
+        return kwargs

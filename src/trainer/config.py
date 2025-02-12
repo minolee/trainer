@@ -1,18 +1,12 @@
 from __future__ import annotations
-
-import accelerate
 from src.base import BaseConfig, CallConfig
-from src.data import DataModule
-from src.data.reader import ReaderConfig, PromptTemplate, get_prompt
-from src.data.dataset import FormatConfig
-from src.data.dataloader import get_collate_fn, DataLoaderConfig
+from src.data import DataConfig
 from src.model import ModelConfig
 from src.tokenizer import TokenizerConfig
 from src.env import MODEL_SAVE_DIR
 from src.utils import world_size, is_rank_zero, rank, drop_unused_args, create_get_fn
 
 from .trainer import get_trainer
-from ..config import TaskConfig
 from pydantic import Field
 
 import torch
@@ -30,20 +24,20 @@ def create_trainer(config: TrainConfig):
     kwargs = {} # PPO같은 일부 trainer들은 model, arg 순서로 받지 않아서 kwargs로 넘겨줌
 
     name = config.model_name
-    per_device_train_batch_size = getattr(config.training_arguments, "per_device_train_batch_size", 8)
+    # per_device_train_batch_size = getattr(config.training_arguments, "per_device_train_batch_size", 8)
     # config.dataloader.batch_size = per_device_train_batch_size
-    if hasattr(config.training_arguments, "deepspeed"):
-        config.training_arguments.deepspeed["train_micro_batch_size_per_gpu"] = per_device_train_batch_size # type: ignore
+    # if hasattr(config.training_arguments, "deepspeed"):
+    #     config.training_arguments.deepspeed["train_micro_batch_size_per_gpu"] = per_device_train_batch_size # type: ignore
         # config.training_arguments.load_best_model_at_end = True
     # set trainer and training argument class
-    
-    base_trainer: type[transformers.Trainer] = get_trainer(config.base_trainer)
+    assert isinstance(config.trainer, CallConfig)
+    base_trainer: type[transformers.Trainer] = get_trainer(config.trainer.name)
     argument_cls = inspect.signature(base_trainer.__init__).parameters["args"].annotation
     if not inspect.isclass(argument_cls): # maybe union or optional type
         argument_cls = argument_cls.__args__[0]
     train_args: transformers.TrainingArguments = argument_cls(
         f"{MODEL_SAVE_DIR}/{name}", 
-        **drop_unused_args(argument_cls.__init__, config.training_arguments.model_dump())
+        **drop_unused_args(argument_cls.__init__, config.trainer.get_kwargs())
     ) # deepspeed init here
     
     
@@ -55,6 +49,7 @@ def create_trainer(config: TrainConfig):
     #     kwargs["compute_loss_func"] = get_loss_fn(config.loss)()
     # load model
     model = config.model()
+    assert config.tokenizer
     tokenizer = config.tokenizer()
     if not hasattr(tokenizer, "pad_token") or tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
@@ -70,21 +65,14 @@ def create_trainer(config: TrainConfig):
 
     if config.reward_model:
         kwargs["reward_model"] = config.reward_model()
-    if config.dataloader is not None and config.dataloader.collate_fn:
-        kwargs["data_collator"] = get_collate_fn(config.dataloader.collate_fn)
     
     # load data
-    datamodule = DataModule(
-        config.reader,
-        config.format,
-        config.tokenizer
-    )
+    datamodule = config.data()
 
-    datamodule.prepare_data(["train", "dev"])
-    datamodule.info()
     kwargs["train_dataset"] = datamodule["train"]
-    kwargs["eval_dataset"] = datamodule["dev"]
+    kwargs["eval_dataset"] = datamodule.get("dev", None)
     
+    print(datamodule["train"][0])
     
     # print model summary
     # 모델의 모든 파라미터를 가져옵니다.
@@ -106,19 +94,20 @@ def create_trainer(config: TrainConfig):
 
     return base_trainer(**kwargs)
 
-class TrainConfig(TaskConfig):
+class TrainConfig(BaseConfig):
 
     model_name: str 
     """모델이 저장될 이름, 학습 결과는 이 path에 저장됨"""
-    base_trainer: str | CallConfig = "Trainer"
+    trainer: str | CallConfig = "Trainer"
     
-    reader: ReaderConfig
-    format: str | CallConfig
-    dataloader: DataLoaderConfig | None = None
-    tokenizer: TokenizerConfig | None = None
+    data: DataConfig
+    """학습에 사용할 데이터를 정의"""
     
-    model: ModelConfig
+    model: ModelConfig | str
     """학습을 진행할 메인 모델"""
+
+    tokenizer: TokenizerConfig | None = None
+    """모델에 사용할 tokenizer. 없을 경우 model의 tokenizer를 사용"""
 
     ref_model: ModelConfig | None = None
     """DPO 등의 preference learning 과정에서 사용할 reference model. 없을 경우 Trainer default 사용"""
@@ -130,29 +119,35 @@ class TrainConfig(TaskConfig):
     optimizer: CallConfig | None = None
     scheduler: CallConfig | None = None
 
-    training_arguments: BaseConfig = Field(default_factory=lambda: BaseConfig())
+
+    is_deepspeed: bool = False
+    """수동으로 설정하지 말 것"""
+    # training_arguments: BaseConfig = Field(default_factory=lambda: BaseConfig())
     """hf trainer config. check https://huggingface.co/docs/transformers/v4.47.1/en/main_classes/trainer#transformers.TrainingArguments"""
+
 
 
     def __call__(self):
         """Config를 사용하여 모델을 학습합니다."""
         save_dir = self.save_dir
         os.makedirs(save_dir, exist_ok=True)
+        if isinstance(self.model, str):
+            self.model = ModelConfig(path=self.model)
         if self.tokenizer is None:
             self.tokenizer = TokenizerConfig(path=self.model.path)
+        if isinstance(self.trainer, str):
+            self.trainer = CallConfig(name=self.trainer)
         trainer = create_trainer(self)
         if is_rank_zero():
             print("start training...")
-            print(self.training_arguments)
+            
             print(self.model)
             self.tokenizer().save_pretrained(save_dir)
         trainer.train()
         print(f"{rank()}/{world_size()}: training finished")
         if is_rank_zero():
             self.model.path = save_dir
-            self.dump(os.path.join(save_dir, "config.yaml"))
-        
-        if not getattr(self.training_arguments, "deepspeed", {}):
+        if self.is_deepspeed:
             # deepspeed 환경에서 이거 부르면 영원히 끝나지 않는다. 대신 convert_checkpoint를 부를 것
             trainer.save_model(save_dir)
         else:

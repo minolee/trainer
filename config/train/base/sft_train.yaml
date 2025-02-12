@@ -1,50 +1,28 @@
 
 model_name: test_gpt2_sft
-base_trainer: SFTTrainer
-reader:
-  sources:
-    - name: test
-      source: rsc/data/sft/AiHub-Largeai_SFT_QA.jsonl
-      limit: 500
-      reader: read_simple
-
-
-
-dataset:
-  prompt: Llama31
-  dataset: 
-    name: SFTDataset
-    max_length: 1024
-
-dataloader:
-  shuffle: true
-  num_workers: 0 # num_workers > 0이면 메모리 더 나감
-  collate_fn: base_collate_fn
-
-
-tokenizer:
-  path: openai-community/gpt2
-
-model:
-  path: openai-community/gpt2
-  device: mps
-
-
-loss:
-  name: CrossEntropyLoss
-  ignore_index: -100
-
-optimizer:
-  name: adamw_hf
-  learning_rate: 5.0e-05
-  weight_decay: 0.01
-
-scheduler:
-  name: linear
-  warmup_ratio: 0.1
-
-training_arguments:
+trainer: 
+  name: SFTTrainer
   num_train_epochs: 1
   gradient_accumulation_steps: 4
   per_device_train_batch_size: 8
   logging_steps: 5
+
+data:
+  sources:
+    - name: test
+      source: rsc/data/AiHub-Largeai_SFT_QA.jsonl
+      limit: 500
+      reader: read_simple
+    - name: hub
+      source: trl-lib/tldr
+      split: train
+      limit: 500
+      reader: read_prompt
+      use_cache: true
+
+  formatter: format_sft
+
+model:
+  path: Qwen/Qwen2-0.5B-Instruct
+  device: cpu
+

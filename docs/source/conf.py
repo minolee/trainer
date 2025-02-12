@@ -10,7 +10,7 @@ import os, sys
 sys.path.insert(0, os.path.abspath('../../'))
 
 
-project = 'MLOps'
+project = 'Trainer'
 copyright = '2025, Minho Lee'
 author = 'Minho Lee'
 

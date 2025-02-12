@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 from typing import Iterable, Any
-from src.base import BaseMessage, PreferenceMessage, DataElem
+from src.base import BaseMessage, PreferenceMessage, Instance
 from src.utils import create_get_fn
 
 
@@ -18,7 +18,7 @@ get_reader = create_get_fn(__name__, type_hint=reader_type) # 이게되네
 def read_simple(source: dict) -> dict | None:
     """jsonl file with dialogHistory key"""
     if "dialogHistory" not in source: return
-    return DataElem(
+    return Instance(
         elem=[BaseMessage(**x) for x in source["dialogHistory"]]
     ).model_dump()
 
@@ -33,6 +33,15 @@ def read_preference(source: dict) -> dict | None:
         message=source["chosen"]["message"],
         rejected_message=source["rejected"]["message"]
     ))
-    dl = DataElem(elem=messages)
+    dl = Instance(elem=messages)
     result = dl.model_dump()
     return result
+
+def read_prompt(source: dict) -> dict | None:
+    """ref: https://huggingface.co/datasets/trl-lib/tldr"""
+    return Instance(
+        elem = [
+            BaseMessage(speaker="user", message=source["prompt"]),
+            BaseMessage(speaker="assistant", message=source["completion"])
+        ]
+    ).model_dump()
