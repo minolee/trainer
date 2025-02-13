@@ -76,6 +76,11 @@ data:
 
 config file과 같은 디렉토리에 있는 파이썬 파일에 있는 함수를 사용할 수 있습니다.
 
+#### Issue
+* Chat template의 경우 model에 정의된 jinja template를 사용합니다. [HF document](https://huggingface.co/docs/transformers/chat_templating)
+  * default chat template를 사용하는 경우 system, user, assistant 가 아닌 다른 role을 사용할 때 오류가 나고 있어, 현재 reader function에서는 role을 강제로 변경하고 있습니다.
+
+
 ### 모델 준비
 
 config yaml 파일의 `model` 부분에 정의합니다.
