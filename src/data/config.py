@@ -126,7 +126,8 @@ class DataElem(BaseConfig):
         formatter = get_formatter(self.formatter)
         if self.filter is not None:
             filter_fn = [get_filter(x) for x in self.filter]
-        
+        else:
+            filter_fn = []
         if self.source is None:
             assert self.name is not None
             self.source = self.name
