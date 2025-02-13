@@ -50,7 +50,7 @@ def create_get_fn(*name: str | ModuleType, type_hint: T | None = None) -> Callab
     :type registry: dict[str, T] | ModuleType
     """
 
-    registry = [sys.modules[x] if isinstance(x, str) else x for x in name]
+    registry: list[ModuleType | dict] = [sys.modules[x] if isinstance(x, str) else x for x in name]
     registry.append(custom_modules)
     def iter_name_get(name: str, reg: dict | ModuleType):
         if isinstance(reg, dict):
