@@ -12,7 +12,7 @@ def accuracy_reward(completions, sol, **kwargs):
     contents = [completion[0]["content"] for completion in completions]
     rewards = []
     for content, s in zip(contents, sol):
-        gold_parsed = s
+        gold_parsed = eval(s)
         # gold_parsed = parse(
         #     sol,
         #     extraction_mode="first_match",
