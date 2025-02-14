@@ -112,8 +112,10 @@ class DataElem(BaseConfig):
     use_cache: bool = False
     """Cache 사용 여부"""
 
-    dataset: DatasetDict | IterableDatasetDict | None = Field(default=None, exclude=True)
+    dataset: DatasetDict | IterableDatasetDict = Field(default_factory=lambda: DatasetDict(), exclude=True)
     """loaded data"""
+
+    use_as: str | None = None
 
     def __call__(
         self
@@ -159,8 +161,10 @@ class DataElem(BaseConfig):
             elif isinstance(dataset, IterableDataset):
                 dataset = IterableDatasetDict({dataset.split: dataset})
             if self.limit and self.limit > 0:
-                dataset = DatasetDict({k: dataset[k].select(range(self.limit // len(datasets))) for k in dataset.keys()})
+                dataset = DatasetDict({k: dataset[k].select(range(min(self.limit // len(datasets), len(dataset[k])))) for k in dataset.keys()})
+            original_column = dataset[list(dataset.keys())[0]].column_names
             dataset = dataset.map(reader).filter(lambda x: x is not None)
+            dataset = dataset.remove_columns(original_column)
             for filter in filter_fn:
                 dataset = dataset.filter(filter)
             dataset = dataset.map(formatter)
@@ -170,6 +174,8 @@ class DataElem(BaseConfig):
         self.dataset = DatasetDict()
         for dataset in datasets:
             for k, v in dataset.items():
+                if self.use_as:
+                    k = self.use_as
                 if k in self.dataset:
                     self.dataset[k] = concatenate_datasets([self.dataset[k], v])
                 else:
