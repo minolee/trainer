@@ -36,13 +36,16 @@ def create_trainer(config: TrainConfig):
     if not inspect.isclass(argument_cls): # maybe union or optional type
         argument_cls = argument_cls.__args__[0]
     
-    trainer_kwargs = {
+    config_kwargs = {
         k: getattr(P, k, lambda x: x)(v) for k, v in config.trainer.get_kwargs().items()
     }
+    trainer_kwargs = drop_unused_args(argument_cls.__init__, config_kwargs)
+    trainer_remainder = {k: v for k, v in config_kwargs.items() if k not in trainer_kwargs}
     train_args: transformers.TrainingArguments = argument_cls(
         f"{MODEL_SAVE_DIR}/{name}", 
-        **drop_unused_args(argument_cls.__init__, trainer_kwargs)
+        **trainer_kwargs
     ) # deepspeed init here
+    kwargs |= trainer_remainder
     
     if config.optimizer:
         train_args.set_optimizer(**config.optimizer.model_dump())

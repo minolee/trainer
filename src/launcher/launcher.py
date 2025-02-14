@@ -132,7 +132,7 @@ class LauncherConfig(BaseConfig):
                 proc.wait()
         
         else:
-            load_module(output_dir)
+            load_module(os.path.split(self.run_config)[0]) # for debug
             config()
 
         if is_main:
