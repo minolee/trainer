@@ -1,3 +1,4 @@
+from requests.exceptions import SSLError
 from src.base import BaseConfig
 from transformers import AutoConfig, AutoModelForCausalLM, PreTrainedModel
 __all__ = ["ModelConfig"]
@@ -25,7 +26,10 @@ class ModelConfig(BaseConfig):
                 AutoConfig.from_pretrained(self.path)
             ) # does not load weights
         else:
-            model = AutoModelForCausalLM.from_pretrained(self.path, **kwargs)
+            try:
+                model = AutoModelForCausalLM.from_pretrained(self.path, **kwargs)
+            except SSLError:
+                model = AutoModelForCausalLM.from_pretrained(self.path, local_files_only=True, **kwargs)
         
         model.to(self.device) # type: ignore
         self.model_type = getattr(model.config, "model_type", "unknown")

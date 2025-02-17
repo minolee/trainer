@@ -1,0 +1,28 @@
+
+model_name: test_gpt2_dpo
+trainer: 
+  name: DPOTrainer
+  num_train_epochs: 1
+  gradient_accumulation_steps: 4
+  per_device_train_batch_size: 2
+  lr_scheduler_type: cosine
+  warmup_ratio: 0.1
+
+data:
+  sources:
+    - name: test
+      source: rsc/data/preference/helpfulness/dpo_1cycle_241016.jsonl
+      split: train
+      limit: 500
+  reader: read_preference
+  formatter: format_preference
+
+# dataloader:
+#   shuffle: true
+#   num_workers: 0
+  # collate_fn: preference_collate_fn
+
+model:
+  path: Qwen/Qwen2-0.5B-Instruct
+  device: mps
+

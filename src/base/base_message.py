@@ -13,6 +13,12 @@ class BaseMessage(BaseModel):
     speaker: str
     message: str
 
+    @field_validator("speaker")
+    def process_speaker(cls, v):
+        v = v.lower()
+        if v == "midm":
+            v = "assistant"
+        return v
 
     def __str__(self):
         return f"{self.speaker}: {self.message}"

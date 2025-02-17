@@ -1,5 +1,3 @@
-# TODO support for custom functions
-
 import importlib.util
 import os
 import sys
@@ -12,7 +10,7 @@ custom_modules: dict[str, ModuleType] = {}
 def import_module_from_path(module_name, file_path):
     # 파일 경로에서 모듈의 spec(스펙)을 생성합니다.
     spec = importlib.util.spec_from_file_location(module_name, file_path)
-    assert spec is not None
+    assert spec is not None and spec.loader is not None, f"Failed to import {module_name} from {file_path}"
     # spec을 바탕으로 모듈 객체를 생성합니다.
     module = importlib.util.module_from_spec(spec)
     
@@ -28,8 +26,8 @@ def load_module(d: str):
     """
     directory에서 모듈을 로드
 
-    :param d: _description_
-    :type d: _type_
+    :param d: 모듈을 로드할 디렉토리
+    :type d: str
     """
     for fname in os.listdir(d):
         if fname.endswith(".py"):

@@ -5,9 +5,7 @@ trainer:
   name: GRPOTrainer
   bf16: true
   use_vllm: false
-  vllm_device: auto
-  vllm_gpu_memory_utilization: 0.7
-  do_eval: true
+  do_eval: false
   eval_strategy: steps
   eval_steps: 100
   gradient_accumulation_steps: 16
@@ -18,7 +16,7 @@ trainer:
   log_level: info
   logging_steps: 5
   logging_strategy: steps
-  lr_scheduler_type: cosine
+  
   max_prompt_length: 512
   max_completion_length: 1024
   max_steps: -1
@@ -32,16 +30,25 @@ trainer:
   save_strategy: "no"
   seed: 42
   warmup_ratio: 0.1
+  reward_funcs:
+    - reward.accuracy_reward
+    - reward.format_reward
 
 data:
   sources:
     - source: AI-MO/NuminaMath-TIR
       use_cache: true
       reader: reader.read_sol
+      limit: 500
+    - source: AI-MO/NuminaMath-TIR
+      use_cache: true
+      use_as: dev
+      reader: reader.read_sol
+      split: train[-100:]
 
-format: reader.format_conversation
+  formatter: reader.format_conversation
 
 model: 
-  path: Qwen/Qwen2.5-1.5B-Instruct
+  path: Qwen/Qwen2-0.5B-Instruct
   torch_dtype: bfloat16
-  attn_implementation: flash_attention_2
+  device: mps

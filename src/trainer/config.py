@@ -5,7 +5,7 @@ from src.model import ModelConfig
 from src.tokenizer import TokenizerConfig
 from src.env import MODEL_SAVE_DIR
 from src.utils import world_size, is_rank_zero, rank, drop_unused_args, create_get_fn
-
+from . import preprocess_args as P
 from pydantic import Field
 
 import torch
@@ -14,7 +14,7 @@ import trl
 import os
 import inspect
 
-
+get_trainer = create_get_fn(transformers, trl, type_hint=transformers.Trainer)
 get_optimizer = create_get_fn(torch.optim, type_hint=torch.optim.Optimizer)
 
 def create_trainer(config: TrainConfig):
@@ -30,15 +30,25 @@ def create_trainer(config: TrainConfig):
         # config.training_arguments.load_best_model_at_end = True
     # set trainer and training argument class
     assert isinstance(config.trainer, CallConfig)
+    assert isinstance(config.model, ModelConfig)
+    if getattr(config.trainer, "report_to", None) == "wandb":
+        os.environ["WANDB_PROJECT"] = name
+
     base_trainer: type[transformers.Trainer] = get_trainer(config.trainer.name)
     argument_cls = inspect.signature(base_trainer.__init__).parameters["args"].annotation
     if not inspect.isclass(argument_cls): # maybe union or optional type
         argument_cls = argument_cls.__args__[0]
+    
+    config_kwargs = {
+        k: getattr(P, k, lambda x: x)(v) for k, v in config.trainer.get_kwargs().items()
+    }
+    trainer_kwargs = drop_unused_args(argument_cls.__init__, config_kwargs)
+    trainer_remainder = {k: v for k, v in config_kwargs.items() if k not in trainer_kwargs}
     train_args: transformers.TrainingArguments = argument_cls(
         f"{MODEL_SAVE_DIR}/{name}", 
-        **drop_unused_args(argument_cls.__init__, config.trainer.get_kwargs())
+        **trainer_kwargs
     ) # deepspeed init here
-    
+    kwargs |= trainer_remainder
     
     if config.optimizer:
         train_args.set_optimizer(**config.optimizer.model_dump())
@@ -57,13 +67,13 @@ def create_trainer(config: TrainConfig):
     kwargs["processing_class"] = tokenizer
     kwargs["args"] = train_args
     
-    if config.ref_model:
-        ref_model = config.ref_model()
-        ref_model.eval()
-        kwargs["ref_model"] = ref_model
+    # if config.ref_model:
+    #     ref_model = config.ref_model()
+    #     ref_model.eval()
+    #     kwargs["ref_model"] = ref_model
 
-    if config.reward_model:
-        kwargs["reward_model"] = config.reward_model()
+    # if config.reward_model:
+    #     kwargs["reward_model"] = config.reward_model()
     
     # load data
     datamodule = config.data()
@@ -71,7 +81,14 @@ def create_trainer(config: TrainConfig):
     kwargs["train_dataset"] = datamodule["train"]
     kwargs["eval_dataset"] = datamodule.get("dev", None)
     
-    print(datamodule["train"][0])
+    
+    try:
+        val_elem = datamodule["train"][0]
+        
+    except:
+        val_elem = next(iter(datamodule["train"]))
+    print(val_elem)
+    # print(tokenizer.apply_chat_template(val_elem))
     
     # print model summary
     # 모델의 모든 파라미터를 가져옵니다.
@@ -108,12 +125,6 @@ class TrainConfig(BaseConfig):
     tokenizer: TokenizerConfig | None = None
     """모델에 사용할 tokenizer. 없을 경우 model의 tokenizer를 사용"""
 
-    ref_model: ModelConfig | None = None
-    """DPO 등의 preference learning 과정에서 사용할 reference model. 없을 경우 Trainer default 사용"""
-    reward_model: ModelConfig | None = None
-    """PPO 등의 learning 과정에서 reward를 계산할 때 사용할 모델"""
-
-
     loss: CallConfig | None = None
     optimizer: CallConfig | None = None
     scheduler: CallConfig | None = None
@@ -146,9 +157,9 @@ class TrainConfig(BaseConfig):
         print(f"{rank()}/{world_size()}: training finished")
         if is_rank_zero():
             self.model.path = save_dir
-        if self.is_deepspeed:
+        if not self.is_deepspeed:
             # deepspeed 환경에서 이거 부르면 영원히 끝나지 않는다. 대신 convert_checkpoint를 부를 것
-            trainer.save_model(save_dir)
+            trainer.model.save_pretrained(save_dir)
         else:
             if is_rank_zero():
                 from src.utils import convert_checkpoint
