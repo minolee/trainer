@@ -31,6 +31,9 @@ def create_trainer(config: TrainConfig):
     # set trainer and training argument class
     assert isinstance(config.trainer, CallConfig)
     assert isinstance(config.model, ModelConfig)
+    if getattr(config.trainer, "report_to", None) == "wandb":
+        os.environ["WANDB_PROJECT"] = name
+        
     base_trainer: type[transformers.Trainer] = get_trainer(config.trainer.name)
     argument_cls = inspect.signature(base_trainer.__init__).parameters["args"].annotation
     if not inspect.isclass(argument_cls): # maybe union or optional type
@@ -78,7 +81,11 @@ def create_trainer(config: TrainConfig):
     kwargs["train_dataset"] = datamodule["train"]
     kwargs["eval_dataset"] = datamodule.get("dev", None)
     
-    print(datamodule["train"][0])
+    
+    try:
+        print(datamodule["train"][0])
+    except:
+        print(next(iter(datamodule["train"])))
     
     # print model summary
     # 모델의 모든 파라미터를 가져옵니다.
