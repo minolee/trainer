@@ -33,7 +33,7 @@ def create_trainer(config: TrainConfig):
     assert isinstance(config.model, ModelConfig)
     if getattr(config.trainer, "report_to", None) == "wandb":
         os.environ["WANDB_PROJECT"] = name
-        
+
     base_trainer: type[transformers.Trainer] = get_trainer(config.trainer.name)
     argument_cls = inspect.signature(base_trainer.__init__).parameters["args"].annotation
     if not inspect.isclass(argument_cls): # maybe union or optional type
@@ -83,9 +83,12 @@ def create_trainer(config: TrainConfig):
     
     
     try:
-        print(datamodule["train"][0])
+        val_elem = datamodule["train"][0]
+        
     except:
-        print(next(iter(datamodule["train"])))
+        val_elem = next(iter(datamodule["train"]))
+    print(val_elem)
+    # print(tokenizer.apply_chat_template(val_elem))
     
     # print model summary
     # 모델의 모든 파라미터를 가져옵니다.
@@ -154,9 +157,9 @@ class TrainConfig(BaseConfig):
         print(f"{rank()}/{world_size()}: training finished")
         if is_rank_zero():
             self.model.path = save_dir
-        if self.is_deepspeed:
+        if not self.is_deepspeed:
             # deepspeed 환경에서 이거 부르면 영원히 끝나지 않는다. 대신 convert_checkpoint를 부를 것
-            trainer.save_model(save_dir)
+            trainer.model.save_pretrained(save_dir)
         else:
             if is_rank_zero():
                 from src.utils import convert_checkpoint
