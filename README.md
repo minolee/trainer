@@ -40,7 +40,7 @@ slurm을 통해 스크립트를 실행할 경우에도 적용됩니다.
 
 각각의 과정은 모두 Config로 제어 가능합니다. Config class를 참고해서 작성해 주세요.
 
-예시 config 파일은 [config/base](https://github.com/minolee/trainer/tree/main/config/base) 디렉토리에서 확인할 수 있습니다.
+예시 config 파일은 [config/base](https://github.com/minolee/trainer/tree/main/example/train/base) 디렉토리에서 확인할 수 있습니다.
 
 ### Data 준비
 
@@ -111,7 +111,7 @@ trainer:
 config yaml 파일과 같은 디렉토리에 파이썬 파일을 작성하면, 자동으로 해당 파이썬 파일을 가져와서 함수 이름을 불러옵니다.
 
 custom 함수를 사용하기 위해서는 <파일명>.<함수명> 으로 불러오면 됩니다.
-[open-r1 example](https://github.com/minolee/trainer/tree/main/config/train/custom/open_r1) 안의 예시 파일들을 확인해 주세요.
+[open-r1 example](https://github.com/minolee/trainer/tree/main/example/train/custom/open_r1) 안의 예시 파일들을 확인해 주세요.
 
 
 ### Document
