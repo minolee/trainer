@@ -8,6 +8,7 @@ import random
 import string
 from ..trainer import TrainConfig
 from ..utils import parse_nodelist, is_localhost, read_magic, write_magic, load_module, rank_zero_print
+from ..env import Accelerator
 __all__ = ["LauncherConfig"]
 
 class LauncherConfig(BaseConfig):
@@ -59,6 +60,7 @@ class LauncherConfig(BaseConfig):
         return result
 
     def __call__(self):
+
         is_main = self.is_main
         is_slurm = "SLURM_JOB_ID" in os.environ
         self.is_main = False
@@ -80,7 +82,9 @@ class LauncherConfig(BaseConfig):
             rank_zero_print("Running script with SLURM")
             nodes = parse_nodelist(os.environ["SLURM_JOB_NODELIST"])
             rank_zero_print("# of nodes:", len(nodes)) # 잘 됨
+            
         if is_main:
+            
             output_dir = config.save_dir
             os.makedirs(output_dir, exist_ok=True)
             launch_config = self.model_dump()
@@ -151,7 +155,8 @@ class LauncherConfig(BaseConfig):
             status = [proc.wait()]
 
         else:
-            # rank_zero_print("Start training")
+            rank_zero_print("Start training")
+            print(self, self.run_config)
             # print("Rank", self.local_rank)
             load_module(os.path.split(self.run_config)[0]) # for debug
             config()
