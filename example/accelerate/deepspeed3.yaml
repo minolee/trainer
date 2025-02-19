@@ -8,5 +8,3 @@ deepspeed_config:
   zero3_init_flag: true
   zero_stage: 3
 main_training_function: main
-num_processes: 8
-num_machines: 1

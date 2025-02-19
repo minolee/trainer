@@ -32,7 +32,10 @@ def create_trainer(config: TrainConfig):
     assert isinstance(config.trainer, CallConfig)
     assert isinstance(config.model, ModelConfig)
     if getattr(config.trainer, "report_to", None) == "wandb":
+        import wandb
         os.environ["WANDB_PROJECT"] = name
+        with open(".env/wandb", encoding="UTF8") as f:  
+            wandb.login(key=f.read().strip())
 
     base_trainer: type[transformers.Trainer] = get_trainer(config.trainer.name)
     argument_cls = inspect.signature(base_trainer.__init__).parameters["args"].annotation
@@ -148,6 +151,7 @@ class TrainConfig(BaseConfig):
         if isinstance(self.trainer, str):
             self.trainer = CallConfig(name=self.trainer)
         trainer = create_trainer(self)
+        print(rank())
         if is_rank_zero():
             print("start training...")
             

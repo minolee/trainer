@@ -12,6 +12,7 @@ accelerate
 trl
 peft
 wandb
+flash-attn
 
 # Open-R1
 latex2sympy2_extended
