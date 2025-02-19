@@ -151,10 +151,9 @@ class TrainConfig(BaseConfig):
         if isinstance(self.trainer, str):
             self.trainer = CallConfig(name=self.trainer)
         trainer = create_trainer(self)
-        print(rank())
+        # print(rank()) # prints True
         if is_rank_zero():
             print("start training...")
-            
             print(self.model)
             self.tokenizer().save_pretrained(save_dir)
         trainer.train()
