@@ -1,0 +1,35 @@
+src package
+===========
+
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   src.base
+   src.data
+   src.launcher
+   src.model
+   src.tokenizer
+   src.trainer
+   src.utils
+
+Submodules
+----------
+
+src.env module
+--------------
+
+.. automodule:: src.env
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: src
+   :members:
+   :undoc-members:
+   :show-inheritance:

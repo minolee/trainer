@@ -1,0 +1,29 @@
+src.trainer package
+===================
+
+Submodules
+----------
+
+src.trainer.config module
+-------------------------
+
+.. automodule:: src.trainer.config
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+src.trainer.preprocess\_args module
+-----------------------------------
+
+.. automodule:: src.trainer.preprocess_args
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: src.trainer
+   :members:
+   :undoc-members:
+   :show-inheritance:

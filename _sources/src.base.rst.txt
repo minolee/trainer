@@ -1,0 +1,37 @@
+src.base package
+================
+
+Submodules
+----------
+
+src.base.base\_config module
+----------------------------
+
+.. automodule:: src.base.base_config
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+src.base.base\_instance module
+------------------------------
+
+.. automodule:: src.base.base_instance
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+src.base.base\_message module
+-----------------------------
+
+.. automodule:: src.base.base_message
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: src.base
+   :members:
+   :undoc-members:
+   :show-inheritance:

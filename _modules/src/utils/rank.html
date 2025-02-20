@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>src.utils.rank &#8212; Trainer  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/basic.css?v=686e5160" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/alabaster.css?v=27fed22d" />
+    <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+   
+  <link rel="stylesheet" href="../../../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for src.utils.rank</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">functools</span><span class="w"> </span><span class="kn">import</span> <span class="n">wraps</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;rank&quot;</span><span class="p">,</span> <span class="s2">&quot;world_size&quot;</span><span class="p">,</span> <span class="s2">&quot;is_rank_zero&quot;</span><span class="p">,</span> <span class="s2">&quot;rank_zero_print&quot;</span><span class="p">,</span> <span class="s2">&quot;rank_zero_only&quot;</span><span class="p">,</span> <span class="s2">&quot;rank_iter&quot;</span><span class="p">]</span>
+
+<div class="viewcode-block" id="rank">
+<a class="viewcode-back" href="../../../src.utils.html#src.utils.rank.rank">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">rank</span><span class="p">():</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">src.env</span><span class="w"> </span><span class="kn">import</span> <span class="n">Accelerator</span>
+    <span class="c1"># print(&quot;RANK&quot;, Accelerator is not None, Accelerator.process_index if Accelerator is not None else None)</span>
+    <span class="k">return</span> <span class="p">(</span><span class="ow">not</span> <span class="n">Accelerator</span><span class="p">)</span> <span class="ow">or</span> <span class="n">Accelerator</span><span class="o">.</span><span class="n">process_index</span></div>
+
+
+
+<div class="viewcode-block" id="world_size">
+<a class="viewcode-back" href="../../../src.utils.html#src.utils.rank.world_size">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">world_size</span><span class="p">():</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">src.env</span><span class="w"> </span><span class="kn">import</span> <span class="n">Accelerator</span>
+    <span class="k">return</span> <span class="p">(</span><span class="ow">not</span> <span class="n">Accelerator</span><span class="p">)</span> <span class="ow">or</span> <span class="n">Accelerator</span><span class="o">.</span><span class="n">num_processes</span></div>
+
+
+
+<div class="viewcode-block" id="is_rank_zero">
+<a class="viewcode-back" href="../../../src.utils.html#src.utils.rank.is_rank_zero">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">is_rank_zero</span><span class="p">():</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">src.env</span><span class="w"> </span><span class="kn">import</span> <span class="n">Accelerator</span>
+    <span class="c1"># print(&quot;RANK&quot;, Accelerator is not None, Accelerator.process_index if Accelerator is not None else None) # None이라는데?</span>
+    <span class="c1"># print(os.environ.get(&quot;LOCAL_RANK&quot;, 0)) # 얘는 잘 됨</span>
+    <span class="c1"># print(&quot;Accelerator is&quot;, Accelerator) # 얘 아까 잘 됐는데?</span>
+    <span class="c1"># check if this is main process(rank 0), works for all distributed</span>
+    <span class="c1"># print(os.environ.get(&quot;LOCAL_RANK&quot;), rank(), world_size()) # 동작은 잘 하는데, init 시점을 잘 잡아야 함. model init이랑 함께 dist가 동작하는듯?</span>
+    <span class="k">return</span> <span class="p">(</span><span class="ow">not</span> <span class="n">Accelerator</span><span class="p">)</span> <span class="ow">or</span> <span class="n">Accelerator</span><span class="o">.</span><span class="n">is_local_main_process</span></div>
+
+
+<div class="viewcode-block" id="rank_zero_print">
+<a class="viewcode-back" href="../../../src.utils.html#src.utils.rank.rank_zero_print">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">rank_zero_print</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">is_rank_zero</span><span class="p">:</span> <span class="nb">print</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="rank_zero_only">
+<a class="viewcode-back" href="../../../src.utils.html#src.utils.rank.rank_zero_only">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">rank_zero_only</span><span class="p">(</span><span class="n">fn</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    distributed 환경에서 rank가 0인 프로세스에서만 실행되도록 하는 데코레이터</span>
+<span class="sd">    </span>
+<span class="sd">    TODO return value가 있는 경우에는 어떻게 처리할 것인가?</span>
+<span class="sd">    context manager로 처리하는 것이 좋을 것 같음</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="nd">@wraps</span><span class="p">(</span><span class="n">fn</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">inner</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">is_rank_zero</span><span class="p">():</span>
+            <span class="k">return</span> <span class="n">fn</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">inner</span></div>
+
+
+<div class="viewcode-block" id="rank_iter">
+<a class="viewcode-back" href="../../../src.utils.html#src.utils.rank.rank_iter">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">rank_iter</span><span class="p">(</span><span class="n">fn</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    distributed 환경에서 rank와 world size를 받아서 일부를 skip함</span>
+<span class="sd">    반드시 iterable을 return하는 함수에 사용할 것</span>
+<span class="sd">    테스트 필요</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">w</span> <span class="o">=</span> <span class="n">world_size</span><span class="p">()</span>
+    <span class="n">r</span> <span class="o">=</span> <span class="n">rank</span><span class="p">()</span>
+    <span class="nd">@wraps</span><span class="p">(</span><span class="n">fn</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">inner_fn</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">item</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">fn</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)):</span>
+            <span class="k">if</span> <span class="n">i</span> <span class="o">%</span> <span class="n">w</span> <span class="o">==</span> <span class="n">r</span><span class="p">:</span>
+                <span class="k">yield</span> <span class="n">item</span>
+    <span class="k">return</span> <span class="n">inner_fn</span></div>
+
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../../index.html">Trainer</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules.html">src</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../index.html">Documentation overview</a><ul>
+  <li><a href="../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2025, Minho Lee.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.1.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -1,0 +1,45 @@
+src.data package
+================
+
+Submodules
+----------
+
+src.data.config module
+----------------------
+
+.. automodule:: src.data.config
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+src.data.filter module
+----------------------
+
+.. automodule:: src.data.filter
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+src.data.formatter module
+-------------------------
+
+.. automodule:: src.data.formatter
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+src.data.reader module
+----------------------
+
+.. automodule:: src.data.reader
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: src.data
+   :members:
+   :undoc-members:
+   :show-inheritance:

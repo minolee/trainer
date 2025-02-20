@@ -1,0 +1,21 @@
+src.tokenizer package
+=====================
+
+Submodules
+----------
+
+src.tokenizer.config module
+---------------------------
+
+.. automodule:: src.tokenizer.config
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: src.tokenizer
+   :members:
+   :undoc-members:
+   :show-inheritance:
