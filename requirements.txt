@@ -7,9 +7,9 @@ deprecated
 
 datasets
 tokenizers
-transformers
-accelerate
-trl
+transformers==4.47
+accelerate==1.1.1
+trl==0.13
 peft
 wandb
 flash-attn
@@ -18,4 +18,4 @@ flash-attn
 latex2sympy2_extended
 math-verify
 
-deepspeed; platform_system == "Linux"
+deepspeed==0.15.4; platform_system == "Linux"

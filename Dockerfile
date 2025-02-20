@@ -12,4 +12,5 @@ COPY .env .env
 
 RUN wandb login $(cat .env/wandb)
 
-COPY . .
+# COPY . . # copy해서 image를 만드는 대신 그냥 workdir mount로 하는게 훨씬 나음
+
