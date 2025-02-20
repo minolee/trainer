@@ -4,7 +4,7 @@ from src.data import DataConfig
 from src.model import ModelConfig
 from src.tokenizer import TokenizerConfig
 from src.env import MODEL_SAVE_DIR
-from src.utils import world_size, is_rank_zero, rank, drop_unused_args, create_get_fn
+from src.utils import world_size, is_rank_zero, rank, drop_unused_args, create_get_fn, rank_zero_print
 from . import preprocess_args as P
 from pydantic import Field
 
@@ -32,7 +32,10 @@ def create_trainer(config: TrainConfig):
     assert isinstance(config.trainer, CallConfig)
     assert isinstance(config.model, ModelConfig)
     if getattr(config.trainer, "report_to", None) == "wandb":
+        import wandb
         os.environ["WANDB_PROJECT"] = name
+        with open(".env/wandb", encoding="UTF8") as f:  
+            wandb.login(key=f.read().strip())
 
     base_trainer: type[transformers.Trainer] = get_trainer(config.trainer.name)
     argument_cls = inspect.signature(base_trainer.__init__).parameters["args"].annotation
@@ -48,7 +51,11 @@ def create_trainer(config: TrainConfig):
         f"{MODEL_SAVE_DIR}/{name}", 
         **trainer_kwargs
     ) # deepspeed init here
+
+    rank_zero_print(train_args)
+    
     kwargs |= trainer_remainder
+    # rank_zero_print(kwargs)
     
     if config.optimizer:
         train_args.set_optimizer(**config.optimizer.model_dump())
@@ -58,6 +65,7 @@ def create_trainer(config: TrainConfig):
     #     kwargs["compute_loss_func"] = get_loss_fn(config.loss)()
     # load model
     model = config.model()
+    rank_zero_print(model)
     assert config.tokenizer
     tokenizer = config.tokenizer()
     if not hasattr(tokenizer, "pad_token") or tokenizer.pad_token is None:
@@ -148,9 +156,9 @@ class TrainConfig(BaseConfig):
         if isinstance(self.trainer, str):
             self.trainer = CallConfig(name=self.trainer)
         trainer = create_trainer(self)
+        # print(rank()) # prints True
         if is_rank_zero():
             print("start training...")
-            
             print(self.model)
             self.tokenizer().save_pretrained(save_dir)
         trainer.train()

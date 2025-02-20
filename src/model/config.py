@@ -12,7 +12,7 @@ class ModelConfig(BaseConfig):
     # check https://huggingface.co/docs/transformers/v4.39.3/en/model_doc/auto#transformers.AutoConfig.from_pretrained
     load_weight: bool = True
     """if false, will load model without weights"""
-    device: str = "cuda" # device to use
+    device: str | None = None # device to use
 
     def __call__(self) -> PreTrainedModel:
         """load model from config"""
@@ -30,7 +30,7 @@ class ModelConfig(BaseConfig):
                 model = AutoModelForCausalLM.from_pretrained(self.path, **kwargs)
             except SSLError:
                 model = AutoModelForCausalLM.from_pretrained(self.path, local_files_only=True, **kwargs)
-        
-        model.to(self.device) # type: ignore
+        if self.device:
+            model.to(self.device) # type: ignore
         self.model_type = getattr(model.config, "model_type", "unknown")
         return model

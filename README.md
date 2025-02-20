@@ -34,6 +34,18 @@ slurm을 통해 스크립트를 실행할 경우에도 적용됩니다.
 ### Deepspeed
 미구현, 하지만 accelerate config에 deepspeed를 사용할 수 있습니다.
 
+### Slurm
+Slurm을 사용해서 실행하기 위해서는 OCI bundle 형태로 준비해야 합니다.
+
+https://slurm.schedmd.com/containers.html#bundle 를 참고하여 bundle을 만들어 주세요.
+
+Dockerfile을 사용해서 docker image를 만들면 됩니다.
+
+```bash
+docker build -t trainer .
+enroot import -o [PATH] dockerd://trainer
+```
+
 ## (필독) Config 작성 방법
 
 데이터 준비, 모델 준비, trainer 준비 -> 실행 의 과정으로 이루어져 있습니다.

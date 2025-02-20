@@ -10,3 +10,6 @@ lightning_logs
 key.json
 unused/
 wandb/
+slurm/
+azcopy.sh
+.env/
