@@ -61,6 +61,29 @@ class LauncherConfig(BaseConfig):
                 result.extend([f"--{k}", str(v)])
         return result
 
+    def create_accelerate_args(self, idx=None):
+        if self.nodes:
+            # 각각의 node마다 수행할 accelerate config를 복사하여 저장
+            nodes = parse_nodelist(self.nodes)
+        elif "SLURM_JOB_NODELIST" in os.environ:
+            nodes = parse_nodelist(os.environ["SLURM_JOB_NODELIST"])
+        else:
+            nodes = ["localhost"]
+        host = nodes[0]
+
+        if idx is None:
+            assert "SLURM_NODEID" in os.environ, "Must specify machine index"
+            idx = os.environ["SLURM_NODEID"]
+        assert int(idx) < len(nodes)
+        result = (
+                        ["--config_file", self.accelerate_config]
+                        + ["--machine_rank", str(idx)]
+                        + ["--num_machines", str(len(nodes))]
+                        + ["--main_process_ip", host]
+                        + ["--main_process_port", "29500"]
+        )
+        return result
+
     def __call__(self):
 
         is_main = self.is_main
@@ -96,7 +119,6 @@ class LauncherConfig(BaseConfig):
             rank_zero_print("# of nodes:", len(nodes)) # 잘 됨
             
         if is_main:
-            
             output_dir = config.save_dir
             os.makedirs(output_dir, exist_ok=True)
             launch_config = self.model_dump()
@@ -114,9 +136,11 @@ class LauncherConfig(BaseConfig):
 
                 shutil.copy(self.accelerate_config, f"{output_dir}/accelerate_config.yaml")
                 launch_config["accelerate_config"] = f"{output_dir}/accelerate_config.yaml"
+                self.accelerate_config = f"{output_dir}/accelerate_config.yaml"
             if self.deepspeed_config:
                 shutil.copy(self.deepspeed_config, f"{output_dir}/deepspeed_config.yaml")
                 launch_config["deepspeed_config"] = f"{output_dir}/deepspeed_config.yaml"
+                self.deepspeed_config = f"{output_dir}/deepspeed_config.yaml"
             write_magic(f"{output_dir}/launch_config.yaml", launch_config)
         
         if (len(nodes) > 1 or not is_localhost(nodes[0])) and not is_slurm:
@@ -133,10 +157,7 @@ class LauncherConfig(BaseConfig):
                         ["ssh", n] 
                         + ["cd", pwd, "&&"]
                         + [sys.executable, "-m", "accelerate.commands.launch"]
-                        + ["--machine_rank", str(i)]
-                        + ["--main_process_ip", host]
-                        + ["--main_process_port", str(proc_port)]
-                        + ["--config_file", self.accelerate_config]
+                        + self.create_accelerate_args(i)
                         + ["run.py"] + self.subprocess_run_args()
                     ))
                 elif self.deepspeed_config:
@@ -153,7 +174,7 @@ class LauncherConfig(BaseConfig):
             # run in subprocess
             run = []
             if self.accelerate_config:
-                run = [sys.executable, "-m", "accelerate.commands.launch", "--config_file", f"{output_dir}/accelerate_config.yaml" ,"run.py"]
+                run = [sys.executable, "-m", "accelerate.commands.launch", *self.create_accelerate_args(),"run.py"]
                 
             elif self.deepspeed_config:
                 run = [sys.executable, "-m", "deepspeed", "run.py"]
