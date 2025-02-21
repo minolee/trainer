@@ -26,10 +26,6 @@ def format_conversation(data: Instance[BaseMessage]) -> dict | None:
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": data.elem[0].message},
         ],
-        "sol": str(parse(
-            data.elem[1].message,
-            extraction_mode="first_match",
-            extraction_config=[LatexExtractionConfig()],
-        ))
+        "sol": data.elem[1].message
     }
 

@@ -12,12 +12,12 @@ def accuracy_reward(completions, sol, **kwargs):
     contents = [completion[0]["content"] for completion in completions]
     rewards = []
     for content, s in zip(contents, sol):
-        gold_parsed = eval(s)
-        # gold_parsed = parse(
-        #     sol,
-        #     extraction_mode="first_match",
-        #     extraction_config=[LatexExtractionConfig()],
-        # )
+        # gold_parsed = eval(s)
+        gold_parsed = parse(
+            sol,
+            extraction_mode="first_match",
+            extraction_config=[LatexExtractionConfig()],
+        )
         if len(gold_parsed) != 0:
             # We require the answer to be provided in correct latex (no malformed operators)
             answer_parsed = parse(
