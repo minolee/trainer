@@ -95,7 +95,7 @@ def create_trainer(config: TrainConfig):
         
     except:
         val_elem = next(iter(datamodule["train"]))
-    print(val_elem)
+    rank_zero_print(val_elem)
     # print(tokenizer.apply_chat_template(val_elem))
     
     # print model summary
@@ -138,8 +138,12 @@ class TrainConfig(BaseConfig):
     scheduler: CallConfig | None = None
 
 
+    is_accelerate: bool = False
+    """수동 설정 금지"""
     is_deepspeed: bool = False
-    """수동으로 설정하지 말 것"""
+    """수동 설정 금지"""
+    deepspeed_stage: int | None = None
+    """수동 설정 금지"""
     # training_arguments: BaseConfig = Field(default_factory=lambda: BaseConfig())
     """hf trainer config. check https://huggingface.co/docs/transformers/v4.47.1/en/main_classes/trainer#transformers.TrainingArguments"""
 
@@ -159,19 +163,19 @@ class TrainConfig(BaseConfig):
         # print(rank()) # prints True
         if is_rank_zero():
             print("start training...")
-            print(self.model)
+            rank_zero_print(self.model)
             self.tokenizer().save_pretrained(save_dir)
         trainer.train()
         print(f"{rank()}/{world_size()}: training finished")
         if is_rank_zero():
             self.model.path = save_dir
-        if not self.is_deepspeed:
-            # deepspeed 환경에서 이거 부르면 영원히 끝나지 않는다. 대신 convert_checkpoint를 부를 것
-            trainer.model.save_pretrained(save_dir)
-        else:
+        if self.is_deepspeed and self.deepspeed_stage == 3:
             if is_rank_zero():
                 from src.utils import convert_checkpoint
                 convert_checkpoint(save_dir)
+        else:
+            # deepspeed 환경에서 이거 부르면 영원히 끝나지 않는다. 대신 convert_checkpoint를 부를 것
+            trainer.model.save_pretrained(save_dir)
     
     @property
     def save_dir(self):

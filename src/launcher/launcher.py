@@ -38,6 +38,8 @@ class LauncherConfig(BaseConfig):
     """main process 구분용. 수동으로 설정하지 마세요."""
     subproc_accelerate: bool = False
     """자동 설정 - 수동으로 설정하지 말 것"""
+    subproc_deepspeed: bool = False
+    subproc_deepspeed_stage: int | None = None
 
     @property
     def is_deepspeed(self):
@@ -50,7 +52,7 @@ class LauncherConfig(BaseConfig):
     def subprocess_run_args(self):
         """subprocess의 run.py를 통해 실행할 argument들을 정의"""
         result = []
-        for k in ["run_config", "is_main", "subproc_accelerate"]:
+        for k in ["run_config", "is_main", "subproc_accelerate", "subproc_deepspeed", "subproc_deepspeed_stage"]:
             v = getattr(self, k, None)
             k = k.replace("_", "-")
             if isinstance(v, bool):
@@ -64,7 +66,17 @@ class LauncherConfig(BaseConfig):
         is_main = self.is_main
         is_slurm = "SLURM_JOB_ID" in os.environ
         self.is_main = False
-        self.subproc_accelerate = self.accelerate_config is not None
+        self.subproc_accelerate = self.subproc_accelerate or self.accelerate_config is not None
+        if self.accelerate_config:
+            accelerate_config = read_magic(self.accelerate_config)
+        else:
+            accelerate_config = {}
+        self.subproc_deepspeed = self.subproc_deepspeed or (
+            self.accelerate_config is not None \
+                and "deepspeed_config" in accelerate_config
+        )
+        if self.subproc_deepspeed:
+            self.subproc_deepspeed_stage = accelerate_config.get("deepspeed_config", {}).get("zero_stage", None)
         # args = {f"--{k}": v for k in ["mode", "run_config", "local_rank", "is_main", "is_accelerate"] if (v:=getattr(self, k, None))}
         # subproc_run_args = lambda: concat(*[[k, str(v)] for k, v in args.items()])
         # assert sum([bool(self.accelerate_config), bool(self.deepspeed_config), bool(self.slurm_config)]) <= 1, "Only one of accelerate, deepspeed, slurm can be used"
@@ -141,10 +153,6 @@ class LauncherConfig(BaseConfig):
             # run in subprocess
             run = []
             if self.accelerate_config:
-                # 위쪽에서 이미 처리함
-                # conf = read_magic(self.accelerate_config)
-                # assert conf.get("num_machines", 1) == len(nodes), "Number of nodes should be equal to num_machines"
-                # shutil.copy(self.accelerate_config, "accelerate_config.yaml")
                 run = [sys.executable, "-m", "accelerate.commands.launch", "--config_file", f"{output_dir}/accelerate_config.yaml" ,"run.py"]
                 
             elif self.deepspeed_config:
@@ -159,8 +167,10 @@ class LauncherConfig(BaseConfig):
             print(self, self.run_config)
             # print("Rank", self.local_rank)
             load_module(os.path.split(self.run_config)[0]) # for debug
+            config.is_accelerate = self.subproc_accelerate
+            config.is_deepspeed = self.subproc_deepspeed
+            config.deepspeed_stage = self.subproc_deepspeed_stage
             config()
 
         if is_main:
             print("Training finished")
-            
