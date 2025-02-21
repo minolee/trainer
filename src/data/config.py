@@ -124,6 +124,8 @@ class DataElem(BaseConfig):
 
     dataset: DatasetDict | IterableDatasetDict = Field(default_factory=lambda: DatasetDict(), exclude=True)
     """loaded data"""
+    split_dev: bool = False
+    """true로 설정하면 10%는 dev로 씀"""
     raw_reader: str = "json" # TODO json이 아닐 경우
     custom_builder: str | CallConfig | None = None # raw file에서 1:1 대응이 안되거나 특수한 reader가 필요할 때
     use_as: str | None = None
@@ -181,11 +183,11 @@ class DataElem(BaseConfig):
                     dataset = DatasetDict({k: Dataset(dataset[k].take(self.limit // len(datasets))) for k in dataset.keys()})
 
             original_column = dataset[list(dataset.keys())[0]].column_names
-            dataset = dataset.map(reader).filter(lambda x: x is not None)
+            dataset = dataset.map(reader, keep_in_memory=True).filter(lambda x: x is not None)
             dataset = dataset.remove_columns(original_column)
             for filter in filter_fn:
                 dataset = dataset.filter(filter)
-            dataset = dataset.map(formatter)
+            dataset = dataset.map(formatter, keep_in_memory=True)
             return dataset
         datasets = list(map(proc, datasets))
         
@@ -198,6 +200,11 @@ class DataElem(BaseConfig):
                     self.dataset[k] = concatenate_datasets([self.dataset[k], v])
                 else:
                     self.dataset[k] = v
+        if self.split_dev:
+            split = self.dataset["train"].train_test_split(test_size=0.1)
+            self.dataset["train"] = split["train"]
+            self.dataset["dev"] = split["test"]
+
         # for k, v in self.dataset.items():
         #     if isinstance(v, IterableDataset):
         #         data_ex = next(iter(v))
