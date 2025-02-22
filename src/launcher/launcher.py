@@ -79,6 +79,7 @@ class LauncherConfig(BaseConfig):
                         ["--config_file", self.accelerate_config]
                         + ["--machine_rank", str(idx)]
                         + ["--num_machines", str(len(nodes))]
+                        + ["--num_processes", str(len(nodes) * 8)]
                         + ["--main_process_ip", host]
                         + ["--main_process_port", "29500"]
         )
