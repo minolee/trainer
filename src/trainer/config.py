@@ -6,6 +6,7 @@ from src.tokenizer import TokenizerConfig
 from src.env import MODEL_SAVE_DIR
 from src.utils import world_size, is_rank_zero, rank, drop_unused_args, create_get_fn, rank_zero_print
 from . import preprocess_args as P
+from . import postprocess_trainer as POST
 from pydantic import Field
 
 import torch
@@ -96,6 +97,10 @@ def create_trainer(config: TrainConfig):
     except:
         val_elem = next(iter(datamodule["train"]))
     rank_zero_print(val_elem)
+    
+    # postprocess trainer arguments
+    if hasattr(POST, base_trainer.__name__):
+        kwargs = getattr(POST, base_trainer.__name__)(**kwargs)
     # print(tokenizer.apply_chat_template(val_elem))
     
     # print model summary
