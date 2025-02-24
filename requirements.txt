@@ -12,10 +12,11 @@ accelerate==1.1.1
 trl==0.13
 peft
 wandb
-flash-attn
+flash-attn; platform_system == "Linux"
 
 # Open-R1
 latex2sympy2_extended
 math-verify
 
 deepspeed==0.15.4; platform_system == "Linux"
+vllm==0.7.1; platform_system == "Linux"

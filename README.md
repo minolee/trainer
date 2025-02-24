@@ -28,7 +28,7 @@ custom function을 사용하여 개발 시 해당 파일의 tracking이 가능�
 
 slurm style node list를 전달 시 각각의 node에 ssh command를 수행하는 방식으로 multinode 학습을 진행합니다. 자동으로 accelerate config의 num_machines와 machine_rank를 수정합니다.
 
-slurm을 통해 스크립트를 실행할 경우에도 적용됩니다.
+slurm을 통해 스크립트를 실행할 경우에도 적용됩니다. `sbatch --nodes=X ...` 과 같이 실행하면 자동으로 node를 분배해서 실행합니다.
 
 
 ### Deepspeed
