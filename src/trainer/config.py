@@ -7,6 +7,7 @@ from src.env import MODEL_SAVE_DIR
 from src.utils import world_size, is_rank_zero, rank, drop_unused_args, create_get_fn, rank_zero_print
 from . import preprocess_args as P
 from . import postprocess_trainer as POST
+from . import custom as C
 from pydantic import Field
 
 import torch
@@ -15,7 +16,7 @@ import trl
 import os
 import inspect
 
-get_trainer = create_get_fn(transformers, trl, type_hint=transformers.Trainer)
+get_trainer = create_get_fn(transformers, C, trl, type_hint=transformers.Trainer)
 get_optimizer = create_get_fn(torch.optim, type_hint=torch.optim.Optimizer)
 
 def create_trainer(config: TrainConfig):
