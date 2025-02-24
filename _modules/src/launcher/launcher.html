@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>src.launcher.launcher &#8212; Trainer  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/basic.css?v=686e5160" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/alabaster.css?v=27fed22d" />
+    <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+   
+  <link rel="stylesheet" href="../../../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for src.launcher.launcher</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">src.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseConfig</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Literal</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">subprocess</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">shutil</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">random</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">string</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">..trainer</span><span class="w"> </span><span class="kn">import</span> <span class="n">TrainConfig</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">..utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">parse_nodelist</span><span class="p">,</span> <span class="n">is_localhost</span><span class="p">,</span> <span class="n">read_magic</span><span class="p">,</span> <span class="n">write_magic</span><span class="p">,</span> <span class="n">load_module</span><span class="p">,</span> <span class="n">rank_zero_print</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">..env</span><span class="w"> </span><span class="kn">import</span> <span class="n">Accelerator</span>
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;LauncherConfig&quot;</span><span class="p">]</span>
+
+<div class="viewcode-block" id="LauncherConfig">
+<a class="viewcode-back" href="../../../src.launcher.html#src.launcher.launcher.LauncherConfig">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">LauncherConfig</span><span class="p">(</span><span class="n">BaseConfig</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    accelerate, deepspeed, slurm 등을 사용하여 실행할 때 사용하는 config</span>
+
+<span class="sd">    command line에서 --XXX_config 를 통해 파일을 전달하면 해당 파일을 기반으로 XXX를 실행함</span>
+<span class="sd">    supported: python(default), accelerate, slurm</span>
+
+<span class="sd">    config file을 읽어서 해석하고 그에 맞는 command를 실행</span>
+<span class="sd">    python run.py --accelerate_config </span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">run_config</span><span class="p">:</span> <span class="nb">str</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Runnable config file path&quot;&quot;&quot;</span>
+    <span class="n">local_rank</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Distributed 환경을 위한 값. 자동 설정되므로 수동으로 설정하지 마세요.&quot;&quot;&quot;</span>
+    <span class="n">accelerate_config</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;accelerate 기반으로 실행하고 싶을 경우, accelerate config 파일의 path를 입력&quot;&quot;&quot;</span>
+    <span class="n">deepspeed_config</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;deepspeed 기반으로 실행하고 싶을 경우, deepspeed config 파일의 path를 입력 (미구현)&quot;&quot;&quot;</span>
+
+    <span class="n">nodes</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;node를 미리 정해줄 경우 각각의 node마다 process를 실행함. 반드시 accelerate 또는 deepspeed와 함께 사용할 것&quot;&quot;&quot;</span>
+
+    <span class="n">is_main</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;main process 구분용. 수동으로 설정하지 마세요.&quot;&quot;&quot;</span>
+    <span class="n">subproc_accelerate</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;자동 설정 - 수동으로 설정하지 말 것&quot;&quot;&quot;</span>
+    <span class="n">subproc_deepspeed</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="n">subproc_deepspeed_stage</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_deepspeed</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">deepspeed_config</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">True</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">accelerate_config</span> <span class="ow">and</span> <span class="s2">&quot;deepspeed&quot;</span> <span class="ow">in</span> <span class="n">read_magic</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">accelerate_config</span><span class="p">):</span>
+            <span class="k">return</span> <span class="kc">True</span>
+        <span class="k">return</span> <span class="kc">False</span>
+
+<div class="viewcode-block" id="LauncherConfig.subprocess_run_args">
+<a class="viewcode-back" href="../../../src.launcher.html#src.launcher.launcher.LauncherConfig.subprocess_run_args">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">subprocess_run_args</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;subprocess의 run.py를 통해 실행할 argument들을 정의&quot;&quot;&quot;</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;run_config&quot;</span><span class="p">,</span> <span class="s2">&quot;is_main&quot;</span><span class="p">,</span> <span class="s2">&quot;subproc_accelerate&quot;</span><span class="p">,</span> <span class="s2">&quot;subproc_deepspeed&quot;</span><span class="p">,</span> <span class="s2">&quot;subproc_deepspeed_stage&quot;</span><span class="p">]:</span>
+            <span class="n">v</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+            <span class="n">k</span> <span class="o">=</span> <span class="n">k</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">,</span> <span class="s2">&quot;-&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="nb">bool</span><span class="p">):</span>
+                <span class="n">result</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;--</span><span class="si">{</span><span class="s1">&#39;&#39;</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">v</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="s1">&#39;no-&#39;</span><span class="si">}{</span><span class="n">k</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">result</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="sa">f</span><span class="s2">&quot;--</span><span class="si">{</span><span class="n">k</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">v</span><span class="p">)])</span>
+        <span class="k">return</span> <span class="n">result</span></div>
+
+
+<div class="viewcode-block" id="LauncherConfig.create_accelerate_args">
+<a class="viewcode-back" href="../../../src.launcher.html#src.launcher.launcher.LauncherConfig.create_accelerate_args">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">create_accelerate_args</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">idx</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">nodes</span><span class="p">:</span>
+            <span class="c1"># 각각의 node마다 수행할 accelerate config를 복사하여 저장</span>
+            <span class="n">nodes</span> <span class="o">=</span> <span class="n">parse_nodelist</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">nodes</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="s2">&quot;SLURM_JOB_NODELIST&quot;</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">:</span>
+            <span class="n">nodes</span> <span class="o">=</span> <span class="n">parse_nodelist</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;SLURM_JOB_NODELIST&quot;</span><span class="p">])</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">nodes</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;localhost&quot;</span><span class="p">]</span>
+        <span class="n">host</span> <span class="o">=</span> <span class="n">nodes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="n">idx</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="s2">&quot;SLURM_NODEID&quot;</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">,</span> <span class="s2">&quot;Must specify machine index&quot;</span>
+            <span class="n">idx</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;SLURM_NODEID&quot;</span><span class="p">]</span>
+        <span class="k">assert</span> <span class="nb">int</span><span class="p">(</span><span class="n">idx</span><span class="p">)</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="p">(</span>
+                        <span class="p">[</span><span class="s2">&quot;--config_file&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">accelerate_config</span><span class="p">]</span>
+                        <span class="o">+</span> <span class="p">[</span><span class="s2">&quot;--machine_rank&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">idx</span><span class="p">)]</span>
+                        <span class="o">+</span> <span class="p">[</span><span class="s2">&quot;--num_machines&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">))]</span>
+                        <span class="o">+</span> <span class="p">[</span><span class="s2">&quot;--num_processes&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)</span> <span class="o">*</span> <span class="mi">8</span><span class="p">)]</span>
+                        <span class="o">+</span> <span class="p">[</span><span class="s2">&quot;--main_process_ip&quot;</span><span class="p">,</span> <span class="n">host</span><span class="p">]</span>
+                        <span class="o">+</span> <span class="p">[</span><span class="s2">&quot;--main_process_port&quot;</span><span class="p">,</span> <span class="s2">&quot;29500&quot;</span><span class="p">]</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">result</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+
+        <span class="n">is_main</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_main</span>
+        <span class="n">is_slurm</span> <span class="o">=</span> <span class="s2">&quot;SLURM_JOB_ID&quot;</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">is_main</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">subproc_accelerate</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">subproc_accelerate</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">accelerate_config</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">accelerate_config</span><span class="p">:</span>
+            <span class="n">accelerate_config</span> <span class="o">=</span> <span class="n">read_magic</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">accelerate_config</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">accelerate_config</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">subproc_deepspeed</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">subproc_deepspeed</span> <span class="ow">or</span> <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">accelerate_config</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> \
+                <span class="ow">and</span> <span class="s2">&quot;deepspeed_config&quot;</span> <span class="ow">in</span> <span class="n">accelerate_config</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">subproc_deepspeed</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">subproc_deepspeed_stage</span> <span class="o">=</span> <span class="n">accelerate_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;deepspeed_config&quot;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;zero_stage&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="c1"># args = {f&quot;--{k}&quot;: v for k in [&quot;mode&quot;, &quot;run_config&quot;, &quot;local_rank&quot;, &quot;is_main&quot;, &quot;is_accelerate&quot;] if (v:=getattr(self, k, None))}</span>
+        <span class="c1"># subproc_run_args = lambda: concat(*[[k, str(v)] for k, v in args.items()])</span>
+        <span class="c1"># assert sum([bool(self.accelerate_config), bool(self.deepspeed_config), bool(self.slurm_config)]) &lt;= 1, &quot;Only one of accelerate, deepspeed, slurm can be used&quot;</span>
+
+        <span class="c1"># copy config files to output directory</span>
+        
+        <span class="n">config</span> <span class="o">=</span> <span class="n">TrainConfig</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">run_config</span><span class="p">)</span>
+        
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">nodes</span><span class="p">:</span>
+            <span class="c1"># 각각의 node마다 수행할 accelerate config를 복사하여 저장</span>
+            <span class="n">nodes</span> <span class="o">=</span> <span class="n">parse_nodelist</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">nodes</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">nodes</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;localhost&quot;</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">is_slurm</span> <span class="ow">and</span> <span class="n">is_main</span><span class="p">:</span>
+            <span class="n">rank_zero_print</span><span class="p">(</span><span class="s2">&quot;Running script with SLURM&quot;</span><span class="p">)</span>
+            <span class="n">nodes</span> <span class="o">=</span> <span class="n">parse_nodelist</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;SLURM_JOB_NODELIST&quot;</span><span class="p">])</span>
+            <span class="n">rank_zero_print</span><span class="p">(</span><span class="s2">&quot;# of nodes:&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">))</span> <span class="c1"># 잘 됨</span>
+            
+        <span class="k">if</span> <span class="n">is_main</span><span class="p">:</span>
+            <span class="n">output_dir</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">save_dir</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">output_dir</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="n">launch_config</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_dump</span><span class="p">()</span>
+            <span class="n">launch_config</span><span class="p">[</span><span class="s2">&quot;run_config&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">output_dir</span><span class="si">}</span><span class="s2">/run_config.yaml&quot;</span>
+            <span class="n">shutil</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">run_config</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">output_dir</span><span class="si">}</span><span class="s2">/run_config.yaml&quot;</span><span class="p">)</span>
+            <span class="c1"># copy custom files</span>
+            <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">listdir</span><span class="p">(</span><span class="n">sdir</span><span class="o">:=</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">run_config</span><span class="p">)):</span>
+                <span class="k">if</span> <span class="n">f</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;.py&quot;</span><span class="p">):</span>
+                    <span class="n">shutil</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">sdir</span><span class="p">,</span> <span class="n">f</span><span class="p">),</span> <span class="n">output_dir</span><span class="p">)</span>
+            
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">accelerate_config</span><span class="p">:</span>
+                <span class="n">accelerate_config</span> <span class="o">=</span> <span class="n">read_magic</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">accelerate_config</span><span class="p">)</span>
+                <span class="n">accelerate_config</span><span class="p">[</span><span class="s2">&quot;num_machines&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)</span>
+                <span class="n">accelerate_config</span><span class="p">[</span><span class="s2">&quot;num_processes&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)</span> <span class="o">*</span> <span class="mi">8</span>
+
+                <span class="n">shutil</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">accelerate_config</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">output_dir</span><span class="si">}</span><span class="s2">/accelerate_config.yaml&quot;</span><span class="p">)</span>
+                <span class="n">launch_config</span><span class="p">[</span><span class="s2">&quot;accelerate_config&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">output_dir</span><span class="si">}</span><span class="s2">/accelerate_config.yaml&quot;</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">accelerate_config</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">output_dir</span><span class="si">}</span><span class="s2">/accelerate_config.yaml&quot;</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">deepspeed_config</span><span class="p">:</span>
+                <span class="n">shutil</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">deepspeed_config</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">output_dir</span><span class="si">}</span><span class="s2">/deepspeed_config.yaml&quot;</span><span class="p">)</span>
+                <span class="n">launch_config</span><span class="p">[</span><span class="s2">&quot;deepspeed_config&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">output_dir</span><span class="si">}</span><span class="s2">/deepspeed_config.yaml&quot;</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">deepspeed_config</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">output_dir</span><span class="si">}</span><span class="s2">/deepspeed_config.yaml&quot;</span>
+            <span class="n">write_magic</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">output_dir</span><span class="si">}</span><span class="s2">/launch_config.yaml&quot;</span><span class="p">,</span> <span class="n">launch_config</span><span class="p">)</span>
+        
+        <span class="k">if</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">is_localhost</span><span class="p">(</span><span class="n">nodes</span><span class="p">[</span><span class="mi">0</span><span class="p">]))</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">is_slurm</span><span class="p">:</span>
+            <span class="c1"># ssh on each node</span>
+            <span class="c1"># slurm의 경우 알아서 배정할거라서 skip</span>
+            <span class="n">procs</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="n">host</span> <span class="o">=</span> <span class="n">nodes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">pwd</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">()</span>
+            <span class="n">proc_port</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">10000</span><span class="p">,</span> <span class="mi">20000</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">nodes</span><span class="p">):</span>
+                <span class="c1"># 각각의 node마다 ssh로 command 실행</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">accelerate_config</span><span class="p">:</span>
+                    <span class="n">procs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">subprocess</span><span class="o">.</span><span class="n">Popen</span><span class="p">(</span>
+                        <span class="p">[</span><span class="s2">&quot;ssh&quot;</span><span class="p">,</span> <span class="n">n</span><span class="p">]</span> 
+                        <span class="o">+</span> <span class="p">[</span><span class="s2">&quot;cd&quot;</span><span class="p">,</span> <span class="n">pwd</span><span class="p">,</span> <span class="s2">&quot;&amp;&amp;&quot;</span><span class="p">]</span>
+                        <span class="o">+</span> <span class="p">[</span><span class="n">sys</span><span class="o">.</span><span class="n">executable</span><span class="p">,</span> <span class="s2">&quot;-m&quot;</span><span class="p">,</span> <span class="s2">&quot;accelerate.commands.launch&quot;</span><span class="p">]</span>
+                        <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_accelerate_args</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+                        <span class="o">+</span> <span class="p">[</span><span class="s2">&quot;run.py&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">subprocess_run_args</span><span class="p">()</span>
+                    <span class="p">))</span>
+                <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">deepspeed_config</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">NotImplementedError</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;Multi-node는 accelerate를 사용해서 실행해야 합니다.&quot;</span><span class="p">)</span>
+                
+            <span class="c1"># procs = [subprocess.Popen([&quot;ssh&quot;, node] + _args) for node in nodes]</span>
+            <span class="n">status</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">proc</span> <span class="ow">in</span> <span class="n">procs</span><span class="p">:</span>
+                <span class="n">status</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">proc</span><span class="o">.</span><span class="n">wait</span><span class="p">())</span>
+        
+        <span class="k">elif</span> <span class="nb">any</span><span class="p">([</span><span class="bp">self</span><span class="o">.</span><span class="n">accelerate_config</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">deepspeed_config</span><span class="p">])</span> <span class="ow">and</span> <span class="n">is_main</span><span class="p">:</span>
+            <span class="c1"># run in subprocess</span>
+            <span class="n">run</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">accelerate_config</span><span class="p">:</span>
+                <span class="n">run</span> <span class="o">=</span> <span class="p">[</span><span class="n">sys</span><span class="o">.</span><span class="n">executable</span><span class="p">,</span> <span class="s2">&quot;-m&quot;</span><span class="p">,</span> <span class="s2">&quot;accelerate.commands.launch&quot;</span><span class="p">,</span> <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">create_accelerate_args</span><span class="p">(),</span><span class="s2">&quot;run.py&quot;</span><span class="p">]</span>
+                
+            <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">deepspeed_config</span><span class="p">:</span>
+                <span class="n">run</span> <span class="o">=</span> <span class="p">[</span><span class="n">sys</span><span class="o">.</span><span class="n">executable</span><span class="p">,</span> <span class="s2">&quot;-m&quot;</span><span class="p">,</span> <span class="s2">&quot;deepspeed&quot;</span><span class="p">,</span> <span class="s2">&quot;run.py&quot;</span><span class="p">]</span>
+            
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Running&quot;</span><span class="p">,</span> <span class="n">run</span><span class="p">,</span> <span class="s2">&quot; in subprocess&quot;</span><span class="p">)</span>
+            <span class="n">proc</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">Popen</span><span class="p">(</span><span class="n">run</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">subprocess_run_args</span><span class="p">())</span>
+            <span class="n">status</span> <span class="o">=</span> <span class="p">[</span><span class="n">proc</span><span class="o">.</span><span class="n">wait</span><span class="p">()]</span>
+
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">rank_zero_print</span><span class="p">(</span><span class="s2">&quot;Start training&quot;</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">run_config</span><span class="p">)</span>
+            <span class="c1"># print(&quot;Rank&quot;, self.local_rank)</span>
+            <span class="n">load_module</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">run_config</span><span class="p">)[</span><span class="mi">0</span><span class="p">])</span> <span class="c1"># for debug</span>
+            <span class="n">config</span><span class="o">.</span><span class="n">is_accelerate</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">subproc_accelerate</span>
+            <span class="n">config</span><span class="o">.</span><span class="n">is_deepspeed</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">subproc_deepspeed</span>
+            <span class="n">config</span><span class="o">.</span><span class="n">deepspeed_stage</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">subproc_deepspeed_stage</span>
+            <span class="n">config</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">is_main</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Training finished&quot;</span><span class="p">)</span></div>
+
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../../index.html">Trainer</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules.html">src</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../index.html">Documentation overview</a><ul>
+  <li><a href="../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2025, Minho Lee.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.1.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>
