@@ -4,7 +4,7 @@ from src.data import DataConfig
 from src.model import ModelConfig
 from src.tokenizer import TokenizerConfig
 from src.env import MODEL_SAVE_DIR
-from src.utils import world_size, is_rank_zero, rank, drop_unused_args, create_get_fn, rank_zero_print
+from src.utils import world_size, is_rank_zero, rank, drop_unused_args, create_get_fn, rank_zero_pprint, pprint
 from . import preprocess_args as P
 from . import postprocess_trainer as POST
 from . import custom as C
@@ -54,7 +54,6 @@ def create_trainer(config: TrainConfig):
         **trainer_kwargs
     ) # deepspeed init here
 
-    rank_zero_print(train_args)
     
     kwargs |= trainer_remainder
     # rank_zero_print(kwargs)
@@ -67,7 +66,7 @@ def create_trainer(config: TrainConfig):
     #     kwargs["compute_loss_func"] = get_loss_fn(config.loss)()
     # load model
     model = config.model()
-    rank_zero_print(model)
+    
     assert config.tokenizer
     tokenizer = config.tokenizer()
     if not hasattr(tokenizer, "pad_token") or tokenizer.pad_token is None:
@@ -90,18 +89,17 @@ def create_trainer(config: TrainConfig):
 
     kwargs["train_dataset"] = datamodule["train"]
     kwargs["eval_dataset"] = datamodule.get("dev", None)
-    
-    
-    try:
-        val_elem = datamodule["train"][0]
-        
-    except:
-        val_elem = next(iter(datamodule["train"]))
-    rank_zero_print(val_elem)
-    
-    # postprocess trainer arguments
     if hasattr(POST, base_trainer.__name__):
         kwargs = getattr(POST, base_trainer.__name__)(**kwargs)
+    trainer = base_trainer(**kwargs) # 이 시점에서 accelerate가 initialize 되나봄.
+    try:
+        val_elem = datamodule["train"][0] 
+    except:
+        val_elem = next(iter(datamodule["train"]))
+    rank_zero_pprint(val_elem)
+    
+    # postprocess trainer arguments
+    
     # print(tokenizer.apply_chat_template(val_elem))
     
     # print model summary
@@ -122,7 +120,7 @@ def create_trainer(config: TrainConfig):
     # loss_fn: torch.nn.Module = get_loss_fn(config.loss)() # type: ignore
     # kwargs["compute_loss_func"] = lambda model, batch, *_, **__: loss_fn(model, batch)
 
-    return base_trainer(**kwargs)
+    return trainer
 
 class TrainConfig(BaseConfig):
 
@@ -168,19 +166,20 @@ class TrainConfig(BaseConfig):
         trainer = create_trainer(self)
         # print(rank()) # prints True
         if is_rank_zero():
-            print("start training...")
-            rank_zero_print(self.model)
+            rank_zero_pprint(self.model)
             self.tokenizer().save_pretrained(save_dir)
         trainer.train()
         print(f"{rank()}/{world_size()}: training finished")
         if is_rank_zero():
             self.model.path = save_dir
+        
+        rank_zero_pprint("Deepspeed info: ", self.is_deepspeed, self.deepspeed_stage)
         if self.is_deepspeed and self.deepspeed_stage == 3:
             # https://github.com/deepspeedai/DeepSpeed/issues/6836
-            trainer.accelerator.save_state(save_dir)
-            # if is_rank_zero():
-            #     from src.utils import convert_checkpoint
-            #     convert_checkpoint(save_dir)
+            # trainer.accelerator.save_state(save_dir) <- 안됨
+            if is_rank_zero():
+                from src.utils import convert_checkpoint
+                convert_checkpoint(save_dir)
         else:
             # deepspeed 환경에서 이거 부르면 영원히 끝나지 않는다. 대신 convert_checkpoint를 부를 것
             trainer.model.save_pretrained(save_dir)

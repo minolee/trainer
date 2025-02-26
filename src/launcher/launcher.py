@@ -7,7 +7,7 @@ import sys
 import random
 import string
 from ..trainer import TrainConfig
-from ..utils import parse_nodelist, is_localhost, read_magic, write_magic, load_module, rank_zero_print
+from ..utils import parse_nodelist, is_localhost, read_magic, write_magic, load_module, rank_zero_pprint, pprint
 from ..env import Accelerator
 __all__ = ["LauncherConfig"]
 
@@ -86,21 +86,24 @@ class LauncherConfig(BaseConfig):
         return result
 
     def __call__(self):
-
         is_main = self.is_main
         is_slurm = "SLURM_JOB_ID" in os.environ
         self.is_main = False
-        self.subproc_accelerate = self.subproc_accelerate or self.accelerate_config is not None
-        if self.accelerate_config:
-            accelerate_config = read_magic(self.accelerate_config)
-        else:
-            accelerate_config = {}
-        self.subproc_deepspeed = self.subproc_deepspeed or (
-            self.accelerate_config is not None \
-                and "deepspeed_config" in accelerate_config
-        )
-        if self.subproc_deepspeed:
-            self.subproc_deepspeed_stage = accelerate_config.get("deepspeed_config", {}).get("zero_stage", None)
+        # self.subproc_accelerate = self.subproc_accelerate or self.accelerate_config is not None
+        if is_main:
+            if self.accelerate_config:
+                self.subproc_accelerate = True
+                accelerate_config = read_magic(self.accelerate_config)
+            else:
+                accelerate_config = {}
+            self.subproc_deepspeed = self.subproc_deepspeed or (
+                self.accelerate_config is not None \
+                    and "deepspeed_config" in accelerate_config
+            )
+            if self.subproc_deepspeed:
+                # pprint(accelerate_config)
+                self.subproc_deepspeed_stage = accelerate_config.get("deepspeed_config", {}).get("zero_stage", None)
+                # pprint(self.subproc_deepspeed_stage)
         # args = {f"--{k}": v for k in ["mode", "run_config", "local_rank", "is_main", "is_accelerate"] if (v:=getattr(self, k, None))}
         # subproc_run_args = lambda: concat(*[[k, str(v)] for k, v in args.items()])
         # assert sum([bool(self.accelerate_config), bool(self.deepspeed_config), bool(self.slurm_config)]) <= 1, "Only one of accelerate, deepspeed, slurm can be used"
@@ -115,9 +118,9 @@ class LauncherConfig(BaseConfig):
         else:
             nodes = ["localhost"]
         if is_slurm and is_main:
-            rank_zero_print("Running script with SLURM")
+            rank_zero_pprint("Running script with SLURM")
             nodes = parse_nodelist(os.environ["SLURM_JOB_NODELIST"])
-            rank_zero_print("# of nodes:", len(nodes)) # 잘 됨
+            rank_zero_pprint("# of nodes:", len(nodes)) # 잘 됨
             
         if is_main:
             output_dir = config.save_dir
@@ -180,14 +183,11 @@ class LauncherConfig(BaseConfig):
             elif self.deepspeed_config:
                 run = [sys.executable, "-m", "deepspeed", "run.py"]
             
-            print("Running", run, " in subprocess")
+            pprint("Running", run + self.subprocess_run_args(), " in subprocess", flush=True)
             proc = subprocess.Popen(run + self.subprocess_run_args())
             status = [proc.wait()]
 
         else:
-            rank_zero_print("Start training")
-            print(self, self.run_config)
-            # print("Rank", self.local_rank)
             load_module(os.path.split(self.run_config)[0]) # for debug
             config.is_accelerate = self.subproc_accelerate
             config.is_deepspeed = self.subproc_deepspeed
@@ -195,4 +195,4 @@ class LauncherConfig(BaseConfig):
             config()
 
         if is_main:
-            print("Training finished")
+            pprint("Training finished")
