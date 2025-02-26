@@ -1,4 +1,4 @@
-from trl import DataCollatorForCompletionOnlyLM, GRPOTrainer
+from trl import DataCollatorForCompletionOnlyLM
 from transformers import PreTrainedModel, PreTrainedTokenizer
 
 

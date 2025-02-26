@@ -176,9 +176,11 @@ class TrainConfig(BaseConfig):
         if is_rank_zero():
             self.model.path = save_dir
         if self.is_deepspeed and self.deepspeed_stage == 3:
-            if is_rank_zero():
-                from src.utils import convert_checkpoint
-                convert_checkpoint(save_dir)
+            # https://github.com/deepspeedai/DeepSpeed/issues/6836
+            trainer.accelerator.save_state(save_dir)
+            # if is_rank_zero():
+            #     from src.utils import convert_checkpoint
+            #     convert_checkpoint(save_dir)
         else:
             # deepspeed 환경에서 이거 부르면 영원히 끝나지 않는다. 대신 convert_checkpoint를 부를 것
             trainer.model.save_pretrained(save_dir)

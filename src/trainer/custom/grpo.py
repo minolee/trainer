@@ -1,3 +1,16 @@
+# Copyright 2025 The HuggingFace Team. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 import os
 import textwrap
@@ -26,22 +39,24 @@ from transformers import (
     TrainerCallback,
     is_wandb_available,
 )
+import torch.nn.functional as F
 from transformers.integrations.deepspeed import is_deepspeed_zero3_enabled
 from transformers.utils import is_peft_available
-from trl import GRPOTrainer
+
 from trl.data_utils import apply_chat_template, is_conversational, maybe_apply_chat_template
-from trl.import_utils import is_vllm_available
-from trl.models import create_reference_model, prepare_deepspeed, unwrap_model_for_generation
+from trl.models import create_reference_model, unwrap_model_for_generation
 from trl.trainer.callbacks import SyncRefModelCallback
-from trl.trainer.grpo_config import GRPOConfig
-from trl.trainer.utils import generate_model_card, get_comet_experiment_url, pad, selective_log_softmax
+# from trl.trainer.grpo_config import GRPOConfig
+from trl.trainer.utils import generate_model_card, get_comet_experiment_url, pad
+
 
 if is_peft_available():
     from peft import PeftConfig, get_peft_model
 
-if is_vllm_available():
+try:
     from vllm import LLM, SamplingParams
-
+except:
+    pass
 if is_wandb_available():
     import wandb
 
@@ -49,9 +64,322 @@ if is_wandb_available():
 # rewards. When it's a string, it's a model ID, so it's loaded as a pretrained model.
 RewardFunc = Union[str, PreTrainedModel, Callable[[list, list], list[float]]]
 
-__all__ = ["MultiGPUVllmGRPOTrainer"]
+from dataclasses import dataclass, field
+from typing import Optional
 
-class MultiGPUVllmGRPOTrainer(GRPOTrainer):
+from transformers import TrainingArguments
+
+__all__ = ["GRPOConfig", "GRPOTrainer"]
+
+def selective_log_softmax(logits, index):
+    """
+    A memory-efficient implementation of the common `log_softmax -> gather` operation.
+
+    This function is equivalent to the following naive implementation:
+    ```python
+    logps = torch.gather(logits.log_softmax(-1), dim=-1, index=index.unsqueeze(-1)).squeeze(-1)
+    ```
+
+    Args:
+        logits (`torch.Tensor`):
+            Logits tensor of shape `(..., num_classes)`.
+        index (`torch.Tensor`):
+            Index tensor of shape `(...)`, specifying the positions to gather from the log-softmax output.
+
+    Returns:
+        `torch.Tensor`:
+            Gathered log probabilities with the same shape as `index`.
+    """
+    if logits.dtype in [torch.float32, torch.float64]:
+        selected_logits = torch.gather(logits, dim=-1, index=index.unsqueeze(-1)).squeeze(-1)
+        # loop to reduce peak mem consumption
+        logsumexp_values = torch.stack([torch.logsumexp(lg, dim=-1) for lg in logits])
+        per_token_logps = selected_logits - logsumexp_values  # log_softmax(x_i) = x_i - logsumexp(x)
+    else:
+        # logsumexp approach is unstable with bfloat16, fall back to slightly less efficent approach
+        per_token_logps = []
+        for row_logits, row_labels in zip(logits, index):  # loop to reduce peak mem consumption
+            row_logps = F.log_softmax(row_logits, dim=-1)
+            row_per_token_logps = row_logps.gather(dim=-1, index=row_labels.unsqueeze(-1)).squeeze(-1)
+            per_token_logps.append(row_per_token_logps)
+        per_token_logps = torch.stack(per_token_logps)
+    return per_token_logps
+
+
+@dataclass
+class GRPOConfig(TrainingArguments):
+    r"""
+    Configuration class for the [`GRPOTrainer`].
+
+    Only the parameters specific to GRPO training are listed here. For details on other parameters, refer to the
+    [`~transformers.TrainingArguments`] documentation.
+
+    Using [`~transformers.HfArgumentParser`] we can turn this class into
+    [argparse](https://docs.python.org/3/library/argparse#module-argparse) arguments that can be specified on the
+    command line.
+
+    Parameters:
+        > Parameters that control the model and reference model
+
+        model_init_kwargs (`dict[str, Any]` or `None`, *optional*, defaults to `None`):
+            Keyword arguments for [`~transformers.AutoModelForCausalLM.from_pretrained`], used when the `model`
+            argument of the [`GRPOTrainer`] is provided as a string.
+
+        > Parameters that control the data preprocessing
+
+        remove_unused_columns (`bool`, *optional*, defaults to `False`):
+            Whether to only keep the column `"prompt"` in the dataset. If you use a custom reward function that
+            requires any column other than `"prompts"` and `"completions"`, you should keep this to `False`.
+        max_prompt_length (`int` or `None`, *optional*, defaults to `512`):
+            Maximum length of the prompt. If the prompt is longer than this value, it will be truncated left.
+        num_generations (`int` or `None`, *optional*, defaults to `8`):
+            Number of generations per prompt to sample. The global batch size (num_processes * per_device_batch_size)
+            must be divisible by this value.
+        temperature (`float`, *optional*, defaults to `0.9`):
+            Temperature for sampling. The higher the temperature, the more random the completions.
+        max_completion_length (`int` or `None`, *optional*, defaults to `256`):
+            Maximum length of the generated completion.
+        ds3_gather_for_generation (`bool`, *optional*, defaults to `True`):
+            This setting applies to DeepSpeed ZeRO-3. If enabled, the policy model weights are gathered for generation,
+            improving generation speed. However, disabling this option allows training models that exceed the VRAM
+            capacity of a single GPU, albeit at the cost of slower generation. Disabling this option is not compatible
+            with vLLM generation.
+
+        > Parameters that control generation acceleration powered by vLLM
+
+        use_vllm (`bool`, *optional*, defaults to `False`):
+            Whether to use vLLM for generating completions. If set to `True`, ensure that a GPU is kept unused for
+            training, as vLLM will require one for generation. vLLM must be installed (`pip install vllm`).
+        vllm_device (`str`, *optional*, defaults to `"auto"`):
+            Device where vLLM generation will run, e.g. `"cuda:1"`. If set to `"auto"` (default), the system will
+            automatically select the next available GPU after the last one used for training. This assumes that
+            training has not already occupied all available GPUs. If only one device is available, the device will be
+            shared between both training and vLLM.
+        vllm_gpu_memory_utilization (`float`, *optional*, defaults to `0.9`):
+            Ratio (between 0 and 1) of GPU memory to reserve for the model weights, activations, and KV cache on the
+            device dedicated to generation powered by vLLM. Higher values will increase the KV cache size and thus
+            improve the model's throughput. However, if the value is too high, it may cause out-of-memory (OOM) errors
+            during initialization.
+        vllm_dtype (`str`, *optional*, defaults to `"auto"`):
+            Data type to use for vLLM generation. If set to `"auto"`, the data type will be automatically determined
+            based on the model configuration. Find the supported values in the vLLM documentation.
+        vllm_max_model_len (`int` or `None`, *optional*, defaults to `None`):
+            If set, the `max_model_len` to use for vLLM. This could be useful when running with reduced
+            `vllm_gpu_memory_utilization`, leading to a reduced KV cache size. If not set, vLLM will use the model
+            context size, which might be much larger than the KV cache, leading to inefficiencies.
+
+        > Parameters that control the training
+
+        learning_rate (`float`, *optional*, defaults to `1e-6`):
+            Initial learning rate for [`AdamW`] optimizer. The default value replaces that of
+            [`~transformers.TrainingArguments`].
+        beta (`float`, *optional*, defaults to `0.04`):
+            KL coefficient.
+        reward_weights (`list[float]` or `None`, *optional*, defaults to `None`):
+            Weights for each reward function. Must match the number of reward functions. If `None`, all rewards are
+            weighted equally with weight `1.0`.
+        sync_ref_model (`bool`, *optional*, defaults to `False`):
+            Whether to synchronize the reference model with the active model every `ref_model_sync_steps` steps, using
+            the `ref_model_mixup_alpha` parameter. This synchronization originites from the
+            [TR-DPO](https://huggingface.co/papers/2404.09656) paper.
+        ref_model_mixup_alpha (`float`, *optional*, defaults to `0.9`):
+            α parameter from the [TR-DPO](https://huggingface.co/papers/2404.09656) paper, which controls the mix
+            between the current policy and the previous reference policy during updates. The reference policy is
+            updated according to the equation: `π_ref = α * π_θ + (1 - α) * π_ref_prev`. To use this parameter, you
+            must set `sync_ref_model=True`.
+        ref_model_sync_steps (`int`, *optional*, defaults to `64`):
+            τ parameter from the [TR-DPO](https://huggingface.co/papers/2404.09656) paper, which determines how
+            frequently the current policy is synchronized with the reference policy. To use this parameter, you must
+            set `sync_ref_model=True`.
+
+        > Parameters that control the logging
+
+        log_completions (`bool`, *optional*, defaults to `False`):
+            Whether to log the completions during training.
+    """
+
+    # Parameters that control the model and reference model
+    model_init_kwargs: Optional[dict] = field(
+        default=None,
+        metadata={
+            "help": "Keyword arguments for `transformers.AutoModelForCausalLM.from_pretrained`, used when the `model` "
+            "argument of the `GRPOTrainer` is provided as a string."
+        },
+    )
+
+    # Parameters that control the data preprocessing
+    # The default value remove_unused_columns is overwritten from the parent class, because in GRPO we usually rely on
+    # additional columns to compute the reward
+    remove_unused_columns: Optional[bool] = field(
+        default=False,
+        metadata={
+            "help": "Whether to only keep the column 'prompt' in the dataset. If you use a custom reward function "
+            "that requires any column other than 'prompts' and 'completions', you should keep this to `False`."
+        },
+    )
+    max_prompt_length: Optional[int] = field(
+        default=512,
+        metadata={
+            "help": "Maximum length of the prompt. If the prompt is longer than this value, it will be truncated left."
+        },
+    )
+    num_generations: Optional[int] = field(
+        default=8,
+        metadata={
+            "help": "Number of generations to sample. The global batch size (num_processes * per_device_batch_size) "
+            "must be divisible by this value."
+        },
+    )
+    temperature: Optional[float] = field(
+        default=0.9,
+        metadata={"help": "Temperature for sampling. The higher the temperature, the more random the completions."},
+    )
+    max_completion_length: Optional[int] = field(
+        default=256,
+        metadata={"help": "Maximum length of the generated completion."},
+    )
+    ds3_gather_for_generation: bool = field(
+        default=True,
+        metadata={
+            "help": "This setting applies to DeepSpeed ZeRO-3. If enabled, the policy model weights are gathered for "
+            "generation, improving generation speed. However, disabling this option allows training models that "
+            "exceed the VRAM capacity of a single GPU, albeit at the cost of slower generation. Disabling this option "
+            "is not compatible with vLLM generation."
+        },
+    )
+
+    # Parameters that control generation acceleration powered by vLLM
+    use_vllm: Optional[bool] = field(
+        default=False,
+        metadata={
+            "help": "Whether to use vLLM for generating completions. If set to `True`, ensure that a GPU is kept "
+            "unused for training, as vLLM will require one for generation. vLLM must be installed "
+            "(`pip install vllm`)."
+        },
+    )
+    vllm_device: Optional[str] = field(
+        default="auto",
+        metadata={
+            "help": "Device where vLLM generation will run, e.g. 'cuda:1'. If set to 'auto' (default), the system "
+            "will automatically select the next available GPU after the last one used for training. This assumes "
+            "that training has not already occupied all available GPUs."
+        },
+    )
+    vllm_gpu_memory_utilization: float = field(
+        default=0.9,
+        metadata={
+            "help": "Ratio (between 0 and 1) of GPU memory to reserve for the model weights, activations, and KV "
+            "cache on the device dedicated to generation powered by vLLM. Higher values will increase the KV cache "
+            "size and thus improve the model's throughput. However, if the value is too high, it may cause "
+            "out-of-memory (OOM) errors during initialization."
+        },
+    )
+    vllm_dtype: Optional[str] = field(
+        default="auto",
+        metadata={
+            "help": "Data type to use for vLLM generation. If set to 'auto', the data type will be automatically "
+            "determined based on the model configuration. Find the supported values in the vLLM documentation."
+        },
+    )
+    vllm_max_model_len: Optional[int] = field(
+        default=None,
+        metadata={
+            "help": "If set, the `max_model_len` to use for vLLM. This could be useful when running with reduced "
+            "`vllm_gpu_memory_utilization`, leading to a reduced KV cache size. If not set, vLLM will use the model "
+            "context size, which might be much larger than the KV cache, leading to inefficiencies."
+        },
+    )
+
+    # Parameters that control the training
+    learning_rate: float = field(
+        default=1e-6,
+        metadata={
+            "help": "Initial learning rate for `AdamW` optimizer. The default value replaces that of "
+            "`transformers.TrainingArguments`."
+        },
+    )
+    beta: float = field(
+        default=0.04,
+        metadata={"help": "KL coefficient."},
+    )
+    reward_weights: Optional[list[float]] = field(
+        default=None,
+        metadata={
+            "help": "Weights for each reward function. Must match the number of reward functions. If `None`, all "
+            "rewards are weighted equally with weight `1.0`."
+        },
+    )
+    sync_ref_model: bool = field(
+        default=False,
+        metadata={
+            "help": "Whether to synchronize the reference model with the active model every `ref_model_sync_steps` "
+            "steps, using the `ref_model_mixup_alpha` parameter."
+        },
+    )
+    ref_model_mixup_alpha: float = field(
+        default=0.9,
+        metadata={
+            "help": "α parameter from the TR-DPO paper, which controls the mix between the current policy and the "
+            "previous reference policy during updates. The reference policy is updated according to the equation: "
+            "`π_ref = α * π_θ + (1 - α) * π_ref_prev`. To use this parameter, you must set `sync_ref_model=True`."
+        },
+    )
+    ref_model_sync_steps: int = field(
+        default=64,
+        metadata={
+            "help": "τ parameter from the TR-DPO paper, which determines how frequently the current policy is "
+            "synchronized with the reference policy. To use this parameter, you must set `sync_ref_model=True`."
+        },
+    )
+
+    # Parameters that control the logging
+    log_completions: bool = field(
+        default=False,
+        metadata={"help": "Whether to log the completions during training."},
+    )
+
+class RepeatRandomSampler(Sampler):
+    """
+    Sampler that repeats the indices of a dataset N times.
+
+    Args:
+        data_source (`Sized`):
+            Dataset to sample from.
+        repeat_count (`int`):
+            Number of times to repeat each index.
+        seed (`Optional[int]`):
+            Random seed for reproducibility (only affects this sampler).
+
+    Example:
+    ```python
+    >>> sampler = RepeatRandomSampler(["a", "b", "c", "d"], repeat_count=2)
+    >>> list(sampler)
+    [2, 2, 0, 0, 3, 3, 1, 1]
+    ```
+    """
+
+    def __init__(self, data_source: Sized, repeat_count: int, seed: Optional[int] = None):
+        self.data_source = data_source
+        self.repeat_count = repeat_count
+        self.num_samples = len(data_source)
+        self.seed = seed
+        self.generator = torch.Generator()  # Create a local random generator
+        if seed is not None:
+            self.generator.manual_seed(seed)
+
+    def __iter__(self):
+        indexes = [
+            idx
+            for idx in torch.randperm(self.num_samples, generator=self.generator).tolist()
+            for _ in range(self.repeat_count)
+        ]
+        return iter(indexes)
+
+    def __len__(self):
+        return self.num_samples * self.repeat_count
+
+
+class GRPOTrainer(Trainer):
     """
     Trainer for the Group Relative Policy Optimization (GRPO) method. This algorithm was initially proposed in the
     paper [DeepSeekMath: Pushing the Limits of Mathematical Reasoning in Open Language Models](https://huggingface.co/papers/2402.03300).
@@ -318,7 +646,6 @@ class MultiGPUVllmGRPOTrainer(GRPOTrainer):
 
             if self.accelerator.is_main_process:
                 vllm_device = self.args.vllm_device
-                tensor_parallel_size = 1
                 if vllm_device == "auto":
                     if torch.cuda.device_count() == 1:
                         vllm_device = "cuda:0"  # particular case when training with onyl 1 GPU: share it
@@ -340,9 +667,6 @@ class MultiGPUVllmGRPOTrainer(GRPOTrainer):
                         "If this is intentional, you may ignore this warning but should adjust "
                         "`vllm_gpu_memory_utilization` accordingly."
                     )
-                if vllm_device == "multi":
-                    vllm_device = None
-                    tensor_parallel_size=self.accelerator.num_processes
                 # vLLM is not compatible with accelerate. So we need to patch it to make sure we can (1) place the vLLM
                 # model on the desired device (world_size_patch) and (2) avoid a test that is not designed for our
                 # setting (profiling_patch).
@@ -356,7 +680,6 @@ class MultiGPUVllmGRPOTrainer(GRPOTrainer):
                         device=vllm_device,
                         gpu_memory_utilization=self.args.vllm_gpu_memory_utilization,
                         dtype=self.args.vllm_dtype,
-                        tensor_parallel_size=tensor_parallel_size,
                         # Automatic Prefix Caching caches the KV cache of existing queries, so that a new query can
                         # directly reuse the KV cache if it shares the same prefix with one of the existing queries.
                         # This is particularly useful here because we generate completions from the same prompts.
@@ -403,6 +726,40 @@ class MultiGPUVllmGRPOTrainer(GRPOTrainer):
             if isinstance(reward_func, PreTrainedModel):
                 self.reward_funcs[i] = self.accelerator.prepare_model(reward_func, evaluation_mode=True)
 
+    def _set_signature_columns_if_needed(self):
+        # If `self.args.remove_unused_columns` is True, non-signature columns are removed.
+        # By default, this method sets `self._signature_columns` to the model's expected inputs.
+        # In GRPOTrainer, we preprocess data, so using the model's signature columns doesn't work.
+        # Instead, we set them to the columns expected by the `training_step` method, hence the override.
+        if self._signature_columns is None:
+            self._signature_columns = ["prompt"]
+
+    def _get_train_sampler(self) -> Sampler:
+        # Returns a sampler that ensures each prompt is repeated across multiple processes. This guarantees that
+        # identical prompts are distributed to different GPUs, allowing rewards to be computed and normalized correctly
+        # within each prompt group. Using the same seed across processes ensures consistent prompt assignment,
+        # preventing discrepancies in group formation.
+        return RepeatRandomSampler(self.train_dataset, self.num_generations, seed=self.args.seed)
+
+    def _get_eval_sampler(self, eval_dataset) -> Sampler:
+        # Returns a sampler that ensures each prompt is repeated across multiple processes. This guarantees that
+        # identical prompts are distributed to different GPUs, allowing rewards to be computed and normalized correctly
+        # within each prompt group. Using the same seed across processes ensures consistent prompt assignment,
+        # preventing discrepancies in group formation.
+        return RepeatRandomSampler(eval_dataset, self.num_generations, seed=self.args.seed)
+
+    # Get the per-token log probabilities for the completions for the model and the reference model
+    def _get_per_token_logps(self, model, input_ids, attention_mask, logits_to_keep):
+        # We add 1 to `logits_to_keep` because the last logits of the sequence is later excluded
+        logits = model(input_ids=input_ids, attention_mask=attention_mask, logits_to_keep=logits_to_keep + 1).logits
+        logits = logits[:, :-1, :]  # (B, L-1, V), exclude the last logit: it corresponds to the next token pred
+
+        input_ids = input_ids[:, -logits_to_keep:]
+        # For transformers<=4.48, logits_to_keep argument isn't supported, so here we drop logits ourselves.
+        # See https://github.com/huggingface/trl/issues/2770
+        logits = logits[:, -logits_to_keep:]
+        return selective_log_softmax(logits, input_ids)  #  compute logprobs for the input tokens
+
     def _move_model_to_vllm(self):
         with unwrap_model_for_generation(
             self.model, self.accelerator, gather_deepspeed3_params=self.args.ds3_gather_for_generation
@@ -412,6 +769,7 @@ class MultiGPUVllmGRPOTrainer(GRPOTrainer):
             if is_peft_model(unwrapped_model):
                 unwrapped_model.merge_adapter()
                 state_dict = unwrapped_model.state_dict()
+                unwrapped_model.unmerge_adapter()
                 # Remove base_model and base_layer prefixes
                 state_dict = {
                     k.removeprefix("base_model.model.").replace(".base_layer", ""): v for k, v in state_dict.items()
@@ -426,10 +784,292 @@ class MultiGPUVllmGRPOTrainer(GRPOTrainer):
                 }
             else:
                 state_dict = unwrapped_model.state_dict()
+        if self.accelerator.is_main_process:
+            llm_model = self.llm.llm_engine.model_executor.driver_worker.model_runner.model
+            llm_model.load_weights(state_dict.items())
+
+    def _prepare_inputs(self, inputs: dict[str, Union[torch.Tensor, Any]]) -> dict[str, Union[torch.Tensor, Any]]:
+        device = self.accelerator.device
+        prompts = [x["prompt"] for x in inputs]
+        prompts_text = [maybe_apply_chat_template(example, self.processing_class)["prompt"] for example in inputs]
+        prompt_inputs = self.processing_class(
+            prompts_text, return_tensors="pt", padding=True, padding_side="left", add_special_tokens=False
+        )
+        prompt_inputs = super()._prepare_inputs(prompt_inputs)
+        prompt_ids, prompt_mask = prompt_inputs["input_ids"], prompt_inputs["attention_mask"]
+
+        if self.max_prompt_length is not None:
+            prompt_ids = prompt_ids[:, -self.max_prompt_length :]
+            prompt_mask = prompt_mask[:, -self.max_prompt_length :]
+
+        # Generate completions using either vLLM or regular generation
+        if self.args.use_vllm:
+            # First, have main process load weights if needed
+            if self.state.global_step != self._last_loaded_step:
+                self._move_model_to_vllm()
+                self._last_loaded_step = self.state.global_step
+
+            # Generate completions using vLLM: gather all prompts and use them in a single call in the main process
+            all_prompts_text = gather_object(prompts_text)
             if self.accelerator.is_main_process:
-                llm_model = self.llm.llm_engine.model_executor.driver_worker.model_runner.model
-                llm_model.load_weights(state_dict.items())
-            # Unmerge the adapter to restore the model to its original state.
-            # This must be done after loading weights to ensure they correspond to the merged state.
-            if is_peft_model(unwrapped_model):
-                unwrapped_model.unmerge_adapter()
+                outputs = self.llm.generate(all_prompts_text, sampling_params=self.sampling_params, use_tqdm=False)
+                completion_ids = [out.token_ids for completions in outputs for out in completions.outputs]
+            else:
+                completion_ids = [None] * len(all_prompts_text)
+            # Broadcast the completions from the main process to all processes, ensuring each process receives its
+            # corresponding slice.
+            completion_ids = broadcast_object_list(completion_ids, from_process=0)
+            process_slice = slice(
+                self.accelerator.process_index * len(prompts),
+                (self.accelerator.process_index + 1) * len(prompts),
+            )
+            completion_ids = completion_ids[process_slice]
+
+            # Pad the completions, and concatenate them with the prompts
+            completion_ids = [torch.tensor(ids, device=device) for ids in completion_ids]
+            completion_ids = pad(completion_ids, padding_value=self.processing_class.pad_token_id)
+            prompt_completion_ids = torch.cat([prompt_ids, completion_ids], dim=1)
+        else:
+            # Regular generation path
+            with unwrap_model_for_generation(self.model, self.accelerator) as unwrapped_model:
+                prompt_completion_ids = unwrapped_model.generate(
+                    prompt_ids, attention_mask=prompt_mask, generation_config=self.generation_config
+                )
+
+            # Compute prompt length and extract completion ids
+            prompt_length = prompt_ids.size(1)
+            prompt_ids = prompt_completion_ids[:, :prompt_length]
+            completion_ids = prompt_completion_ids[:, prompt_length:]
+
+        # Mask everything after the first EOS token
+        is_eos = completion_ids == self.processing_class.eos_token_id
+        eos_idx = torch.full((is_eos.size(0),), is_eos.size(1), dtype=torch.long, device=device)
+        eos_idx[is_eos.any(dim=1)] = is_eos.int().argmax(dim=1)[is_eos.any(dim=1)]
+        sequence_indices = torch.arange(is_eos.size(1), device=device).expand(is_eos.size(0), -1)
+        completion_mask = (sequence_indices <= eos_idx.unsqueeze(1)).int()
+
+        # Concatenate prompt_mask with completion_mask for logit computation
+        attention_mask = torch.cat([prompt_mask, completion_mask], dim=1)  # (B*G, P+C)
+
+        logits_to_keep = completion_ids.size(1)  # we only need to compute the logits for the completion tokens
+
+        with torch.inference_mode():
+            if self.ref_model is not None:
+                ref_per_token_logps = self._get_per_token_logps(
+                    self.ref_model, prompt_completion_ids, attention_mask, logits_to_keep
+                )
+            else:
+                with self.accelerator.unwrap_model(self.model).disable_adapter():
+                    ref_per_token_logps = self._get_per_token_logps(
+                        self.model, prompt_completion_ids, attention_mask, logits_to_keep
+                    )
+
+        # Decode the generated completions
+        completions_text = self.processing_class.batch_decode(completion_ids, skip_special_tokens=True)
+        if is_conversational(inputs[0]):
+            completions = []
+            for prompt, completion in zip(prompts, completions_text):
+                bootstrap = prompt.pop()["content"] if prompt[-1]["role"] == "assistant" else ""
+                completions.append([{"role": "assistant", "content": bootstrap + completion}])
+        else:
+            completions = completions_text
+
+        rewards_per_func = torch.zeros(len(prompts), len(self.reward_funcs), device=device)
+        for i, (reward_func, reward_processing_class) in enumerate(
+            zip(self.reward_funcs, self.reward_processing_classes)
+        ):
+            if isinstance(reward_func, nn.Module):  # Module instead of PretrainedModel for compat with compiled models
+                if is_conversational(inputs[0]):
+                    messages = [{"messages": p + c} for p, c in zip(prompts, completions)]
+                    texts = [apply_chat_template(x, reward_processing_class)["text"] for x in messages]
+                else:
+                    texts = [p + c for p, c in zip(prompts, completions)]
+                reward_inputs = reward_processing_class(
+                    texts, return_tensors="pt", padding=True, padding_side="right", add_special_tokens=False
+                )
+                reward_inputs = super()._prepare_inputs(reward_inputs)
+                with torch.inference_mode():
+                    rewards_per_func[:, i] = reward_func(**reward_inputs).logits[:, 0]  # Shape (B*G,)
+            else:
+                # Repeat all input columns (but "prompt" and "completion") to match the number of generations
+                keys = [key for key in inputs[0] if key not in ["prompt", "completion"]]
+                reward_kwargs = {key: [example[key] for example in inputs] for key in keys}
+                output_reward_func = reward_func(prompts=prompts, completions=completions, **reward_kwargs)
+                rewards_per_func[:, i] = torch.tensor(output_reward_func, dtype=torch.float32, device=device)
+
+        # Gather the reward per function: this part is crucial, because the rewards are normalized per group and the
+        # completions may be distributed across processes
+        rewards_per_func = gather(rewards_per_func)
+
+        # Apply weights to each reward function's output and sum
+        rewards = (rewards_per_func * self.reward_weights.to(device).unsqueeze(0)).sum(dim=1)
+
+        # Compute grouped-wise rewards
+        mean_grouped_rewards = rewards.view(-1, self.num_generations).mean(dim=1)
+        std_grouped_rewards = rewards.view(-1, self.num_generations).std(dim=1)
+
+        # Normalize the rewards to compute the advantages
+        mean_grouped_rewards = mean_grouped_rewards.repeat_interleave(self.num_generations, dim=0)
+        std_grouped_rewards = std_grouped_rewards.repeat_interleave(self.num_generations, dim=0)
+        advantages = (rewards - mean_grouped_rewards) / (std_grouped_rewards + 1e-4)
+
+        # Slice to keep only the local part of the data
+        process_slice = slice(
+            self.accelerator.process_index * len(prompts),
+            (self.accelerator.process_index + 1) * len(prompts),
+        )
+        advantages = advantages[process_slice]
+
+        # Log the metrics
+        reward_per_func = rewards_per_func.mean(0)
+        for i, reward_func in enumerate(self.reward_funcs):
+            if isinstance(reward_func, nn.Module):  # Module instead of PretrainedModel for compat with compiled models
+                reward_func_name = reward_func.config._name_or_path.split("/")[-1]
+            else:
+                reward_func_name = reward_func.__name__
+            self._metrics[f"rewards/{reward_func_name}"].append(reward_per_func[i].item())
+
+        self._metrics["reward"].append(rewards.mean().item())
+        self._metrics["reward_std"].append(std_grouped_rewards.mean().item())
+
+        if (
+            self.log_completions
+            and self.state.global_step % self.args.logging_steps == 0
+            and "wandb" in self.args.report_to
+        ):
+            import pandas as pd
+
+            # For logging
+            table = {
+                "step": [str(self.state.global_step)] * len(rewards),
+                "prompt": gather_object(prompts_text),
+                "completion": gather_object(completions_text),
+                "reward": rewards.tolist(),
+            }
+            df = pd.DataFrame(table)
+
+            if wandb.run is not None and self.accelerator.is_main_process:
+                wandb.log({"completions": wandb.Table(dataframe=df)})
+
+        return {
+            "prompt_ids": prompt_ids,
+            "prompt_mask": prompt_mask,
+            "completion_ids": completion_ids,
+            "completion_mask": completion_mask,
+            "ref_per_token_logps": ref_per_token_logps,
+            "advantages": advantages,
+        }
+
+    def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
+        if return_outputs:
+            raise ValueError("The GRPOTrainer does not support returning outputs")
+        # Compute the per-token log probabilities for the model
+
+        prompt_ids, prompt_mask = inputs["prompt_ids"], inputs["prompt_mask"]
+        completion_ids, completion_mask = inputs["completion_ids"], inputs["completion_mask"]
+        input_ids = torch.cat([prompt_ids, completion_ids], dim=1)
+        attention_mask = torch.cat([prompt_mask, completion_mask], dim=1)
+        logits_to_keep = completion_ids.size(1)  # we only need to compute the logits for the completion tokens
+
+        per_token_logps = self._get_per_token_logps(model, input_ids, attention_mask, logits_to_keep)
+
+        # Compute the KL divergence between the model and the reference model
+        ref_per_token_logps = inputs["ref_per_token_logps"]
+        per_token_kl = torch.exp(ref_per_token_logps - per_token_logps) - (ref_per_token_logps - per_token_logps) - 1
+
+        # x - x.detach() allows for preserving gradients from x
+        advantages = inputs["advantages"]
+        per_token_loss = torch.exp(per_token_logps - per_token_logps.detach()) * advantages.unsqueeze(1)
+        per_token_loss = -(per_token_loss - self.beta * per_token_kl)
+        loss = ((per_token_loss * completion_mask).sum(dim=1) / completion_mask.sum(dim=1)).mean()
+
+        # Log the metrics
+        completion_length = self.accelerator.gather_for_metrics(completion_mask.sum(1)).float().mean().item()
+        self._metrics["completion_length"].append(completion_length)
+
+        mean_kl = ((per_token_kl * completion_mask).sum(dim=1) / completion_mask.sum(dim=1)).mean()
+        self._metrics["kl"].append(self.accelerator.gather_for_metrics(mean_kl).mean().item())
+
+        return loss
+
+    def prediction_step(self, model, inputs, prediction_loss_only, ignore_keys: Optional[list[str]] = None):
+        inputs = self._prepare_inputs(inputs)
+        with torch.no_grad():
+            with self.compute_loss_context_manager():
+                loss = self.compute_loss(model, inputs)
+            loss = loss.mean().detach()
+        return loss, None, None
+
+    def log(self, logs: dict[str, float], start_time: Optional[float] = None) -> None:
+        metrics = {key: sum(val) / len(val) for key, val in self._metrics.items()}  # average the metrics
+
+        # This method can be called both in training and evaluation. When called in evaluation, the keys in `logs`
+        # start with "eval_". We need to add the prefix "eval_" to the keys in `metrics` to match the format.
+        if next(iter(logs.keys())).startswith("eval_"):
+            metrics = {f"eval_{key}": val for key, val in metrics.items()}
+
+        logs = {**logs, **metrics}
+        if version.parse(transformers.__version__) >= version.parse("4.47.0.dev0"):
+            super().log(logs, start_time)
+        else:  # transformers<=4.46
+            super().log(logs)
+        self._metrics.clear()
+
+    def create_model_card(
+        self,
+        model_name: Optional[str] = None,
+        dataset_name: Optional[str] = None,
+        tags: Union[str, list[str], None] = None,
+    ):
+        """
+        Creates a draft of a model card using the information available to the `Trainer`.
+
+        Args:
+            model_name (`str` or `None`, *optional*, defaults to `None`):
+                Name of the model.
+            dataset_name (`str` or `None`, *optional*, defaults to `None`):
+                Name of the dataset used for training.
+            tags (`str`, `list[str]` or `None`, *optional*, defaults to `None`):
+                Tags to be associated with the model card.
+        """
+        if not self.is_world_process_zero():
+            return
+
+        if hasattr(self.model.config, "_name_or_path") and not os.path.isdir(self.model.config._name_or_path):
+            base_model = self.model.config._name_or_path
+        else:
+            base_model = None
+
+        tags = tags or []
+        if isinstance(tags, str):
+            tags = [tags]
+
+        if hasattr(self.model.config, "unsloth_version"):
+            tags.append("unsloth")
+
+        citation = textwrap.dedent(
+            """\
+            @article{zhihong2024deepseekmath,
+                title        = {{DeepSeekMath: Pushing the Limits of Mathematical Reasoning in Open Language Models}},
+                author       = {Zhihong Shao and Peiyi Wang and Qihao Zhu and Runxin Xu and Junxiao Song and Mingchuan Zhang and Y. K. Li and Y. Wu and Daya Guo},
+                year         = 2024,
+                eprint       = {arXiv:2402.03300},
+            }
+            """
+        )
+
+        model_card = generate_model_card(
+            base_model=base_model,
+            model_name=model_name,
+            hub_model_id=self.hub_model_id,
+            dataset_name=dataset_name,
+            tags=tags,
+            wandb_url=wandb.run.get_url() if is_wandb_available() and wandb.run is not None else None,
+            comet_url=get_comet_experiment_url(),
+            trainer_name="GRPO",
+            trainer_citation=citation,
+            paper_title="DeepSeekMath: Pushing the Limits of Mathematical Reasoning in Open Language Models",
+            paper_id="2402.03300",
+        )
+
+        model_card.save(os.path.join(self.args.output_dir, "README.md"))

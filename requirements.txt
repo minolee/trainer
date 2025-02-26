@@ -9,7 +9,7 @@ datasets
 tokenizers
 transformers==4.47
 accelerate==1.1.1
-trl==0.15
+trl==0.13
 peft
 wandb
 flash-attn; platform_system == "Linux"
