@@ -1,17 +1,17 @@
 from functools import wraps
 
 import os
-__all__ = ["rank", "world_size", "is_rank_zero", "rank_zero_print", "rank_zero_only", "rank_iter"]
+__all__ = ["rank", "world_size", "is_rank_zero", "rank_zero_only", "rank_iter"]
 
 def rank():
     from src.env import Accelerator
     # print("RANK", Accelerator is not None, Accelerator.process_index if Accelerator is not None else None)
-    return (not Accelerator) or Accelerator.process_index
+    return Accelerator is None or Accelerator.process_index
 
 
 def world_size():
     from src.env import Accelerator
-    return (not Accelerator) or Accelerator.num_processes
+    return Accelerator is None or Accelerator.num_processes
 
 
 def is_rank_zero():
@@ -21,10 +21,10 @@ def is_rank_zero():
     # print("Accelerator is", Accelerator) # 얘 아까 잘 됐는데?
     # check if this is main process(rank 0), works for all distributed
     # print(os.environ.get("LOCAL_RANK"), rank(), world_size()) # 동작은 잘 하는데, init 시점을 잘 잡아야 함. model init이랑 함께 dist가 동작하는듯?
-    return (not Accelerator) or Accelerator.is_local_main_process
+    # print("is_rank_zero", Accelerator is None, Accelerator.is_local_main_process, Accelerator.process_index, rank())
+    return Accelerator is None or Accelerator.is_local_main_process
 
-def rank_zero_print(*args, **kwargs):
-    if is_rank_zero: print(*args, **kwargs)
+
 
 def rank_zero_only(fn):
     """
